@@ -372,4 +372,5 @@ This project is intended to be a safe, welcoming space for collaboration, and co
 Built with:
 - [Magnus](https://github.com/matsadler/magnus) for Ruby-Rust bindings
 - [unicode-segmentation](https://github.com/unicode-rs/unicode-segmentation) for Unicode word boundaries
+- [linkify](https://github.com/robinst/linkify) for robust URL and email detection
 - [regex](https://github.com/rust-lang/regex) for pattern matching

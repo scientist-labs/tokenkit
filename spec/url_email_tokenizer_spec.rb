@@ -123,9 +123,21 @@ RSpec.describe "URL/Email Tokenizer" do
       expect(tokens).to include("https://example.com/search?q=test")
     end
 
-    it "handles URLs with localhost" do
-      tokens = TokenKit.tokenize("Connect to http://localhost/api")
-      expect(tokens).to include("http://localhost/api")
+    it "handles URLs with ports" do
+      tokens = TokenKit.tokenize("Connect to http://localhost:3000")
+      expect(tokens).to include("http://localhost:3000")
+    end
+
+    it "handles URLs without schemes" do
+      tokens = TokenKit.tokenize("Visit example.com for details")
+      expect(tokens).to include("example.com")
+      expect(tokens).to include("visit", "for", "details")
+    end
+
+    it "handles URLs in parentheses" do
+      tokens = TokenKit.tokenize("See docs (https://example.com) here")
+      expect(tokens).to include("https://example.com")
+      expect(tokens).to include("see", "docs", "here")
     end
   end
 

@@ -46,8 +46,7 @@ pub fn from_config(config: TokenizerConfig) -> Result<Box<dyn Tokenizer>, String
             Ok(Box::new(PathHierarchyTokenizer::new(config, delimiter)))
         }
         TokenizerStrategy::UrlEmail => {
-            UrlEmailTokenizer::new(config)
-                .map(|t| Box::new(t) as Box<dyn Tokenizer>)
+            Ok(Box::new(UrlEmailTokenizer::new(config)))
         }
     }
 }
