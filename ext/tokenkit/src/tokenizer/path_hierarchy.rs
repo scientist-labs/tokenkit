@@ -1,4 +1,4 @@
-use super::Tokenizer;
+use super::{post_process_with_preserved, Tokenizer};
 use crate::config::TokenizerConfig;
 
 pub struct PathHierarchyTokenizer {
@@ -45,36 +45,7 @@ impl Tokenizer for PathHierarchyTokenizer {
         }
 
         let tokens = self.generate_hierarchy(trimmed);
-
-        let mut result = tokens;
-
-        if self.config.lowercase {
-            result = result.into_iter().map(|t| t.to_lowercase()).collect();
-        }
-
-        if self.config.remove_punctuation {
-            result = result
-                .into_iter()
-                .map(|t| {
-                    let delimiter = &self.delimiter;
-                    t.chars()
-                        .map(|c| {
-                            if c.to_string() == *delimiter {
-                                c
-                            } else if c.is_ascii_punctuation() {
-                                '\0'
-                            } else {
-                                c
-                            }
-                        })
-                        .filter(|&c| c != '\0')
-                        .collect()
-                })
-                .filter(|s: &String| !s.is_empty())
-                .collect();
-        }
-
-        result
+        post_process_with_preserved(tokens, &self.config, Some(&self.delimiter))
     }
 
     fn config(&self) -> &TokenizerConfig {

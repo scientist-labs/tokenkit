@@ -133,7 +133,15 @@ fn tokenize_simple(text: &str) -> Vec<String> {
         .collect()
 }
 
-pub(crate) fn post_process(mut tokens: Vec<String>, config: &TokenizerConfig) -> Vec<String> {
+pub(crate) fn post_process(tokens: Vec<String>, config: &TokenizerConfig) -> Vec<String> {
+    post_process_with_preserved(tokens, config, None)
+}
+
+pub(crate) fn post_process_with_preserved(
+    mut tokens: Vec<String>,
+    config: &TokenizerConfig,
+    preserve_chars: Option<&str>,
+) -> Vec<String> {
     if config.lowercase {
         tokens = tokens.into_iter().map(|t| t.to_lowercase()).collect();
     }
@@ -143,7 +151,14 @@ pub(crate) fn post_process(mut tokens: Vec<String>, config: &TokenizerConfig) ->
             .into_iter()
             .map(|t| {
                 t.chars()
-                    .filter(|c| !c.is_ascii_punctuation())
+                    .filter(|c| {
+                        if let Some(preserved) = preserve_chars {
+                            if preserved.contains(*c) {
+                                return true;
+                            }
+                        }
+                        !c.is_ascii_punctuation()
+                    })
                     .collect()
             })
             .filter(|s: &String| !s.is_empty())
