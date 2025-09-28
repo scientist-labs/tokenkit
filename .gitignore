@@ -6,6 +6,16 @@
 /pkg/
 /spec/reports/
 /tmp/
+*.bundle.dSYM/
+Gemfile.lock
 
 # rspec failure tracking
 .rspec_status
+
+# Rust build artifacts
+/target/
+/ext/tokenkit/target/
+/lib/tokenkit/*.bundle
+/lib/tokenkit/*.so
+/lib/tokenkit/*.dylib
+Cargo.lock
