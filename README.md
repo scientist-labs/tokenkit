@@ -47,7 +47,9 @@ TokenKit.tokenize("Patient received 100ug for BRCA1 study")
 
 ### Unicode (Recommended)
 
-Uses Unicode word segmentation for proper handling of contractions, accents, and multi-language text:
+Uses Unicode word segmentation for proper handling of contractions, accents, and multi-language text.
+
+**✅ Supports `preserve_patterns`**
 
 ```ruby
 TokenKit.configure do |config|
@@ -61,7 +63,9 @@ TokenKit.tokenize("Don't worry about café!")
 
 ### Whitespace
 
-Simple whitespace splitting:
+Simple whitespace splitting.
+
+**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
 
 ```ruby
 TokenKit.configure do |config|
@@ -75,7 +79,9 @@ TokenKit.tokenize("hello world")
 
 ### Pattern (Custom Regex)
 
-Custom tokenization using regex patterns:
+Custom tokenization using regex patterns.
+
+**✅ Supports `preserve_patterns`**
 
 ```ruby
 TokenKit.configure do |config|
@@ -90,7 +96,9 @@ TokenKit.tokenize("anti-CD3 antibody")
 
 ### Sentence
 
-Splits text into sentences using Unicode sentence boundaries:
+Splits text into sentences using Unicode sentence boundaries.
+
+**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
 
 ```ruby
 TokenKit.configure do |config|
@@ -106,7 +114,9 @@ Useful for document-level processing, sentence embeddings, or paragraph analysis
 
 ### Grapheme
 
-Splits text into grapheme clusters (user-perceived characters):
+Splits text into grapheme clusters (user-perceived characters).
+
+**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
 
 ```ruby
 TokenKit.configure do |config|
@@ -123,7 +133,9 @@ Perfect for handling emoji, combining characters, and complex scripts. Set `grap
 
 ### Keyword
 
-Treats entire input as a single token (no splitting):
+Treats entire input as a single token (no splitting).
+
+**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
 
 ```ruby
 TokenKit.configure do |config|
@@ -139,7 +151,9 @@ Ideal for exact matching of SKUs, IDs, product codes, or category names where sp
 
 ### Edge N-gram (Search-as-you-type)
 
-Generates prefixes from the beginning of words for autocomplete functionality:
+Generates prefixes from the beginning of words for autocomplete functionality.
+
+**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
 
 ```ruby
 TokenKit.configure do |config|
@@ -157,7 +171,9 @@ Essential for autocomplete, type-ahead search, and prefix matching. At index tim
 
 ### N-gram (Fuzzy Matching)
 
-Generates all substring n-grams (sliding window) for fuzzy matching and misspelling tolerance:
+Generates all substring n-grams (sliding window) for fuzzy matching and misspelling tolerance.
+
+**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
 
 ```ruby
 TokenKit.configure do |config|
@@ -175,7 +191,9 @@ Perfect for fuzzy search, typo tolerance, and partial matching. Unlike edge n-gr
 
 ### Path Hierarchy (Hierarchical Navigation)
 
-Creates tokens for each level of a path hierarchy:
+Creates tokens for each level of a path hierarchy.
+
+**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
 
 ```ruby
 TokenKit.configure do |config|
@@ -196,7 +214,9 @@ Perfect for filesystem paths, URL structures, category hierarchies, and breadcru
 
 ### URL/Email-Aware (Web Content)
 
-Preserves URLs and email addresses as single tokens while tokenizing surrounding text:
+Preserves URLs and email addresses as single tokens while tokenizing surrounding text.
+
+**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
 
 ```ruby
 TokenKit.configure do |config|
@@ -212,7 +232,9 @@ Essential for user-generated content, customer support messages, product descrip
 
 ### Character Group (Fast Custom Splitting)
 
-Splits text based on a custom set of characters (faster than regex for simple delimiters):
+Splits text based on a custom set of characters (faster than regex for simple delimiters).
+
+**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
 
 ```ruby
 TokenKit.configure do |config|
@@ -233,7 +255,9 @@ Ideal for structured data (CSV, TSV), log parsing, and custom delimiter-based fo
 
 ### Letter (Language-Agnostic)
 
-Splits on any non-letter character (simpler than Unicode tokenizer, no special handling for contractions):
+Splits on any non-letter character (simpler than Unicode tokenizer, no special handling for contractions).
+
+**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
 
 ```ruby
 TokenKit.configure do |config|
@@ -253,7 +277,9 @@ Great for noisy text, mixed scripts, and cases where you want aggressive splitti
 
 ### Lowercase (Efficient Case Normalization)
 
-Like the Letter tokenizer but always lowercases in a single pass (more efficient than letter + lowercase filter):
+Like the Letter tokenizer but always lowercases in a single pass (more efficient than letter + lowercase filter).
+
+**⚠️ Does NOT support `preserve_patterns`** (patterns CANNOT be preserved since this tokenizer always lowercases)
 
 ```ruby
 TokenKit.configure do |config|
