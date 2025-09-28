@@ -70,7 +70,7 @@ module TokenKit
   end
 
   def config_hash
-    _config_hash
+    Configuration.new(_config_hash)
   end
 
   private
@@ -99,14 +99,13 @@ module TokenKit
 
   def normalize_options(opts)
     normalized = {}
+
+    [:extended, :min_gram, :max_gram, :delimiter, :lowercase, :remove_punctuation].each do |key|
+      normalized[key.to_s] = opts[key] if opts.key?(key)
+    end
+
     normalized["strategy"] = opts[:strategy].to_s if opts[:strategy]
     normalized["regex"] = opts[:regex] if opts[:regex]
-    normalized["extended"] = opts[:extended] if opts.key?(:extended)
-    normalized["min_gram"] = opts[:min_gram] if opts.key?(:min_gram)
-    normalized["max_gram"] = opts[:max_gram] if opts.key?(:max_gram)
-    normalized["delimiter"] = opts[:delimiter] if opts.key?(:delimiter)
-    normalized["lowercase"] = opts[:lowercase] if opts.key?(:lowercase)
-    normalized["remove_punctuation"] = opts[:remove_punctuation] if opts.key?(:remove_punctuation)
 
     if opts[:preserve]
       normalized["preserve_patterns"] = Array(opts[:preserve]).map do |pattern|
@@ -139,3 +138,4 @@ module TokenKit
 end
 
 require_relative "tokenkit/config"
+require_relative "tokenkit/configuration"

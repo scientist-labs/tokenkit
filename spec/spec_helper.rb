@@ -1,5 +1,15 @@
 # frozen_string_literal: true
 
+require "simplecov"
+SimpleCov.start do
+  add_filter "/spec/"
+  add_filter "/lib/tokenkit/version.rb"
+
+  enable_coverage :branch
+
+  add_group "Ruby Code", "lib"
+end
+
 require "tokenkit"
 
 RSpec.configure do |config|
