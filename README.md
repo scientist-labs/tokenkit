@@ -36,7 +36,7 @@ TokenKit.tokenize("Patient received 100ug for BRCA1 study")
 
 ## Features
 
-- **Nine tokenization strategies**: whitespace, unicode (recommended), custom regex patterns, sentence, grapheme, keyword, edge n-gram, path hierarchy, and URL/email-aware
+- **Thirteen tokenization strategies**: whitespace, unicode (recommended), custom regex patterns, sentence, grapheme, keyword, edge n-gram, n-gram, path hierarchy, URL/email-aware, character group, letter, and lowercase
 - **Pattern preservation**: Keep domain-specific terms (gene names, measurements, antibodies) intact even with case normalization
 - **Fast**: Rust-backed implementation (~100K docs/sec)
 - **Thread-safe**: Safe for concurrent use
@@ -155,6 +155,24 @@ TokenKit.tokenize("laptop")
 
 Essential for autocomplete, type-ahead search, and prefix matching. At index time, generate edge n-grams of your product names or search terms.
 
+### N-gram (Fuzzy Matching)
+
+Generates all substring n-grams (sliding window) for fuzzy matching and misspelling tolerance:
+
+```ruby
+TokenKit.configure do |config|
+  config.strategy = :ngram
+  config.min_gram = 2        # Minimum n-gram length
+  config.max_gram = 3        # Maximum n-gram length
+  config.lowercase = true
+end
+
+TokenKit.tokenize("quick")
+# => ["qu", "ui", "ic", "ck", "qui", "uic", "ick"]
+```
+
+Perfect for fuzzy search, typo tolerance, and partial matching. Unlike edge n-grams which only generate prefixes, n-grams generate all possible substrings.
+
 ### Path Hierarchy (Hierarchical Navigation)
 
 Creates tokens for each level of a path hierarchy:
@@ -191,6 +209,66 @@ TokenKit.tokenize("Contact support@example.com or visit https://example.com")
 ```
 
 Essential for user-generated content, customer support messages, product descriptions with links, and social media text.
+
+### Character Group (Fast Custom Splitting)
+
+Splits text based on a custom set of characters (faster than regex for simple delimiters):
+
+```ruby
+TokenKit.configure do |config|
+  config.strategy = :char_group
+  config.split_on_chars = ",;"  # Split on commas and semicolons
+  config.lowercase = false
+end
+
+TokenKit.tokenize("apple,banana;cherry")
+# => ["apple", "banana", "cherry"]
+
+# CSV parsing
+TokenKit.tokenize("John Doe,30,Software Engineer")
+# => ["John Doe", "30", "Software Engineer"]
+```
+
+Ideal for structured data (CSV, TSV), log parsing, and custom delimiter-based formats. Default split characters are ` \t\n\r` (whitespace).
+
+### Letter (Language-Agnostic)
+
+Splits on any non-letter character (simpler than Unicode tokenizer, no special handling for contractions):
+
+```ruby
+TokenKit.configure do |config|
+  config.strategy = :letter
+  config.lowercase = true
+end
+
+TokenKit.tokenize("hello-world123test")
+# => ["hello", "world", "test"]
+
+# Handles multiple scripts
+TokenKit.tokenize("Hello-世界-test")
+# => ["hello", "世界", "test"]
+```
+
+Great for noisy text, mixed scripts, and cases where you want aggressive splitting on any non-letter character.
+
+### Lowercase (Efficient Case Normalization)
+
+Like the Letter tokenizer but always lowercases in a single pass (more efficient than letter + lowercase filter):
+
+```ruby
+TokenKit.configure do |config|
+  config.strategy = :lowercase
+end
+
+TokenKit.tokenize("HELLO-WORLD")
+# => ["hello", "world"]
+
+# Case-insensitive search indexing
+TokenKit.tokenize("User-Agent: Mozilla/5.0")
+# => ["user", "agent", "mozilla"]
+```
+
+Perfect for case-insensitive search indexing, normalizing product codes, and cleaning social media text. Handles Unicode correctly, including characters that lowercase to multiple characters (e.g., Turkish İ).
 
 ## Pattern Preservation
 
@@ -263,7 +341,7 @@ Flags work with both Regexp objects and string patterns passed to `:pattern` str
 
 ```ruby
 TokenKit.configure do |config|
-  config.strategy = :unicode              # :whitespace, :unicode, :pattern, :sentence, :grapheme, :keyword, :edge_ngram, :path_hierarchy, :url_email
+  config.strategy = :unicode              # :whitespace, :unicode, :pattern, :sentence, :grapheme, :keyword, :edge_ngram, :ngram, :path_hierarchy, :url_email, :char_group, :letter, :lowercase
   config.lowercase = true                 # Normalize to lowercase
   config.remove_punctuation = false       # Remove punctuation from tokens
   config.preserve_patterns = []           # Regex patterns to preserve
@@ -271,9 +349,10 @@ TokenKit.configure do |config|
   # Strategy-specific options
   config.regex = /\w+/                    # Only for :pattern strategy
   config.grapheme_extended = true         # Only for :grapheme strategy (default: true)
-  config.min_gram = 2                     # Only for :edge_ngram strategy (default: 2)
-  config.max_gram = 10                    # Only for :edge_ngram strategy (default: 10)
+  config.min_gram = 2                     # For :edge_ngram and :ngram strategies (default: 2)
+  config.max_gram = 10                    # For :edge_ngram and :ngram strategies (default: 10)
   config.delimiter = "/"                  # Only for :path_hierarchy strategy (default: "/")
+  config.split_on_chars = " \t\n\r"       # Only for :char_group strategy (default: whitespace)
 end
 ```
 
@@ -308,7 +387,9 @@ All strategy-specific options can be overridden per-call:
 - `:pattern` - `regex: /pattern/`
 - `:grapheme` - `extended: true/false`
 - `:edge_ngram` - `min_gram: n, max_gram: n`
+- `:ngram` - `min_gram: n, max_gram: n`
 - `:path_hierarchy` - `delimiter: "/"`
+- `:char_group` - `split_on_chars: ",;"`
 
 ### Get Current Config
 
@@ -323,14 +404,19 @@ config.preserve_patterns  # => [...]
 
 # Strategy predicates
 config.edge_ngram?        # => false
+config.ngram?             # => false
 config.pattern?           # => false
 config.grapheme?          # => false
 config.path_hierarchy?    # => false
+config.char_group?        # => false
+config.letter?            # => false
+config.lowercase?         # => false
 
 # Strategy-specific accessors
-config.min_gram           # => 2 (for edge_ngram)
-config.max_gram           # => 10 (for edge_ngram)
+config.min_gram           # => 2 (for edge_ngram and ngram)
+config.max_gram           # => 10 (for edge_ngram and ngram)
 config.delimiter          # => "/" (for path_hierarchy)
+config.split_on_chars     # => " \t\n\r" (for char_group)
 config.extended           # => true (for grapheme)
 config.regex              # => "..." (for pattern)
 
@@ -388,17 +474,47 @@ tokens = TokenKit.tokenize(text)
 ### Search Applications
 
 ```ruby
+# Exact matching with case normalization
 TokenKit.configure do |config|
-  config.strategy = :unicode
+  config.strategy = :lowercase
   config.lowercase = true
-  config.remove_punctuation = true
 end
 
-# Normalize search queries
-query_tokens = TokenKit.tokenize(user_query)
+# Index time: normalize documents
+doc_tokens = TokenKit.tokenize("Product Code: ABC-123")
+# => ["product", "code", "abc"]
 
-# Match against normalized documents
-doc_tokens = TokenKit.tokenize(document_text)
+# Query time: normalize user input
+query_tokens = TokenKit.tokenize("product abc")
+# => ["product", "abc"]
+
+# Fuzzy matching with n-grams
+TokenKit.configure do |config|
+  config.strategy = :ngram
+  config.min_gram = 2
+  config.max_gram = 4
+  config.lowercase = true
+end
+
+# Index time: generate n-grams
+TokenKit.tokenize("search")
+# => ["se", "ea", "ar", "rc", "ch", "sea", "ear", "arc", "rch", "sear", "earc", "arch"]
+
+# Query time: typo "serch" still has significant overlap
+TokenKit.tokenize("serch")
+# => ["se", "er", "rc", "ch", "ser", "erc", "rch", "serc", "erch"]
+# Overlap: ["se", "rc", "ch", "rch"] allows matching despite typo
+
+# Autocomplete with edge n-grams
+TokenKit.configure do |config|
+  config.strategy = :edge_ngram
+  config.min_gram = 2
+  config.max_gram = 10
+end
+
+TokenKit.tokenize("laptop")
+# => ["la", "lap", "lapt", "lapto", "laptop"]
+# Matches "la", "lap", "lapt" as user types
 ```
 
 ## Performance

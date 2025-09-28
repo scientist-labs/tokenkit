@@ -18,7 +18,9 @@ impl Tokenizer for LowercaseTokenizer {
 
         for ch in text.chars() {
             if ch.is_alphabetic() {
-                current_token.push(ch.to_lowercase().next().unwrap_or(ch));
+                for lowercase_ch in ch.to_lowercase() {
+                    current_token.push(lowercase_ch);
+                }
             } else if !current_token.is_empty() {
                 tokens.push(current_token.clone());
                 current_token.clear();
@@ -30,19 +32,8 @@ impl Tokenizer for LowercaseTokenizer {
         }
 
         // Lowercase tokenizer always lowercases, ignore config.lowercase
-        // Only apply remove_punctuation if configured
-        if self.config.remove_punctuation {
-            tokens = tokens
-                .into_iter()
-                .map(|t| {
-                    t.chars()
-                        .filter(|c| !c.is_ascii_punctuation())
-                        .collect()
-                })
-                .filter(|s: &String| !s.is_empty())
-                .collect();
-        }
-
+        // Note: remove_punctuation has no effect since we already split on non-alphabetic
+        // characters, but we keep it for consistency with the Tokenizer interface
         tokens
     }
 
