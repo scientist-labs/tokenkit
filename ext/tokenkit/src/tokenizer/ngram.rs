@@ -1,4 +1,4 @@
-use super::{post_process, Tokenizer};
+use super::Tokenizer;
 use crate::config::TokenizerConfig;
 
 pub struct NgramTokenizer {
@@ -63,7 +63,14 @@ impl Tokenizer for NgramTokenizer {
             all_ngrams.extend(ngrams);
         }
 
-        post_process(all_ngrams, &self.config)
+        // Apply lowercase if needed. Note: remove_punctuation already handled above.
+        let mut result = all_ngrams;
+
+        if self.config.lowercase {
+            result = result.into_iter().map(|t| t.to_lowercase()).collect();
+        }
+
+        result
     }
 
     fn config(&self) -> &TokenizerConfig {
