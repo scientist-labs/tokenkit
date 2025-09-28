@@ -14,7 +14,7 @@ RSpec.describe "Pattern Tokenizer" do
   it "supports alphanumeric patterns" do
     TokenKit.configure do |config|
       config.strategy = :pattern
-      config.regex = '[a-zA-Z0-9]+'
+      config.regex = "[a-zA-Z0-9]+"
     end
 
     tokens = TokenKit.tokenize("Test123 abc456")
@@ -24,7 +24,7 @@ RSpec.describe "Pattern Tokenizer" do
   it "supports custom delimiters" do
     TokenKit.configure do |config|
       config.strategy = :pattern
-      config.regex = '[^,]+'
+      config.regex = "[^,]+"
     end
 
     tokens = TokenKit.tokenize("apple,banana,cherry")

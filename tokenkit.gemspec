@@ -33,4 +33,9 @@ Gem::Specification.new do |spec|
   spec.extensions = ["ext/tokenkit/extconf.rb"]
 
   spec.add_dependency "rb_sys", "~> 0.9"
+
+  spec.add_development_dependency "rake", "~> 13.0"
+  spec.add_development_dependency "rake-compiler", "~> 1.2"
+  spec.add_development_dependency "rspec", "~> 3.0"
+  spec.add_development_dependency "standard", "~> 1.3"
 end
