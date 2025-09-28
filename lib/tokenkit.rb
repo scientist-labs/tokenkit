@@ -33,6 +33,11 @@ module TokenKit
       "preserve_patterns" => Config.instance.preserve_patterns.map { |p| p.is_a?(Regexp) ? regex_to_rust(p) : p.to_s }
     }
 
+    # Warn if lowercase: false with :lowercase strategy
+    if Config.instance.strategy == :lowercase && !Config.instance.lowercase
+      warn "Warning: The :lowercase strategy always lowercases text. The 'lowercase: false' setting will be ignored."
+    end
+
     if Config.instance.strategy == :pattern && Config.instance.regex
       regex = Config.instance.regex
       config_hash["regex"] = regex.is_a?(Regexp) ? regex_to_rust(regex) : regex.to_s
@@ -97,6 +102,12 @@ module TokenKit
   def with_temporary_config(opts)
     previous_config = _config_hash
     temp_config = previous_config.merge(normalize_options(opts))
+
+    # Warn if lowercase: false with :lowercase strategy
+    if temp_config["strategy"] == "lowercase" && temp_config["lowercase"] == false
+      warn "Warning: The :lowercase strategy always lowercases text. The 'lowercase: false' setting will be ignored."
+    end
+
     _configure(temp_config)
     yield
   ensure

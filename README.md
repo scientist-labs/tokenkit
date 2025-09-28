@@ -258,6 +258,7 @@ Like the Letter tokenizer but always lowercases in a single pass (more efficient
 ```ruby
 TokenKit.configure do |config|
   config.strategy = :lowercase
+  # Note: config.lowercase setting is ignored - this tokenizer ALWAYS lowercases
 end
 
 TokenKit.tokenize("HELLO-WORLD")
@@ -267,6 +268,8 @@ TokenKit.tokenize("HELLO-WORLD")
 TokenKit.tokenize("User-Agent: Mozilla/5.0")
 # => ["user", "agent", "mozilla"]
 ```
+
+**⚠️ Important**: The `:lowercase` strategy **always** lowercases text, regardless of the `config.lowercase` setting. If you need control over lowercasing, use the `:letter` strategy instead with `config.lowercase = true/false`.
 
 Perfect for case-insensitive search indexing, normalizing product codes, and cleaning social media text. Handles Unicode correctly, including characters that lowercase to multiple characters (e.g., Turkish İ).
 

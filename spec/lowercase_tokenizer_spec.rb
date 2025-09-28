@@ -15,10 +15,12 @@ RSpec.describe "Lowercase Tokenizer" do
   end
 
   it "always lowercases regardless of config" do
-    TokenKit.configure do |config|
-      config.strategy = :lowercase
-      config.lowercase = false  # This should be ignored
-    end
+    expect {
+      TokenKit.configure do |config|
+        config.strategy = :lowercase
+        config.lowercase = false  # This should be ignored
+      end
+    }.to output(/Warning: The :lowercase strategy always lowercases text/).to_stderr
 
     tokens = TokenKit.tokenize("TEST")
     expect(tokens).to eq(["test"])
@@ -173,12 +175,14 @@ RSpec.describe "Lowercase Tokenizer" do
     end
 
     it "ignores lowercase option when using lowercase strategy" do
-      tokens = TokenKit.tokenize(
-        "TEST",
-        strategy: :lowercase,
-        lowercase: false  # Should be ignored
-      )
-      expect(tokens).to eq(["test"])
+      expect {
+        tokens = TokenKit.tokenize(
+          "TEST",
+          strategy: :lowercase,
+          lowercase: false  # Should be ignored
+        )
+        expect(tokens).to eq(["test"])
+      }.to output(/Warning: The :lowercase strategy always lowercases text/).to_stderr
     end
   end
 
