@@ -34,13 +34,11 @@ impl Tokenizer for PatternTokenizer {
             .map(|mat| mat.as_str().to_string())
             .collect();
 
-        let tokens = if !self.preserve_patterns.is_empty() {
-            apply_preserve_patterns(tokens, &self.preserve_patterns, text)
+        if !self.preserve_patterns.is_empty() {
+            apply_preserve_patterns(tokens, &self.preserve_patterns, text, &self.config)
         } else {
-            tokens
-        };
-
-        post_process(tokens, &self.config)
+            post_process(tokens, &self.config)
+        }
     }
 
     fn config(&self) -> &TokenizerConfig {

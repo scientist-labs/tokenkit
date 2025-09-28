@@ -36,7 +36,7 @@ RSpec.describe "Unicode Tokenizer" do
     before do
       TokenKit.configure do |config|
         config.strategy = :unicode
-        config.preserve_patterns = [/\d+ug/i, /anti-\w+/i]
+        config.preserve_patterns = [/\d+ug/i, /anti-cd\d+/i]
       end
     end
 
@@ -46,9 +46,9 @@ RSpec.describe "Unicode Tokenizer" do
       expect(tokens).to include("antibody")
     end
 
-    it "lowercases words normally" do
+    it "preserves case in pattern matches but lowercases other words" do
       tokens = TokenKit.tokenize("Anti-CD3 antibody")
-      expect(tokens).to include("anti", "cd3", "antibody")
+      expect(tokens).to include("Anti-CD3", "antibody")
     end
   end
 end
