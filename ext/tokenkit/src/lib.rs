@@ -44,6 +44,17 @@ fn configure(config_hash: RHash) -> Result<(), Error> {
                 let regex: String = TryConvert::try_convert(regex_val)?;
                 TokenizerStrategy::Pattern { regex }
             }
+            "sentence" => TokenizerStrategy::Sentence,
+            "grapheme" => {
+                let extended_val = config_hash.get("extended");
+                let extended = if let Some(val) = extended_val {
+                    TryConvert::try_convert(val)?
+                } else {
+                    true
+                };
+                TokenizerStrategy::Grapheme { extended }
+            }
+            "keyword" => TokenizerStrategy::Keyword,
             _ => TokenizerStrategy::Unicode,
         }
     } else {
@@ -107,11 +118,18 @@ fn config_hash() -> Result<RHash, Error> {
                 TokenizerStrategy::Whitespace => "whitespace",
                 TokenizerStrategy::Unicode => "unicode",
                 TokenizerStrategy::Pattern { .. } => "pattern",
+                TokenizerStrategy::Sentence => "sentence",
+                TokenizerStrategy::Grapheme { .. } => "grapheme",
+                TokenizerStrategy::Keyword => "keyword",
             };
             hash.aset("strategy", strategy_str)?;
 
             if let TokenizerStrategy::Pattern { regex } = &config.strategy {
                 hash.aset("regex", regex.as_str())?;
+            }
+
+            if let TokenizerStrategy::Grapheme { extended } = &config.strategy {
+                hash.aset("extended", *extended)?;
             }
 
             hash.aset("lowercase", config.lowercase)?;

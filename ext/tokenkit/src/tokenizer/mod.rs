@@ -1,10 +1,16 @@
 mod whitespace;
 mod unicode;
 mod pattern;
+mod sentence;
+mod grapheme;
+mod keyword;
 
 pub use whitespace::WhitespaceTokenizer;
 pub use unicode::UnicodeTokenizer;
 pub use pattern::PatternTokenizer;
+pub use sentence::SentenceTokenizer;
+pub use grapheme::GraphemeTokenizer;
+pub use keyword::KeywordTokenizer;
 
 use crate::config::{TokenizerConfig, TokenizerStrategy};
 use regex::Regex;
@@ -15,14 +21,18 @@ pub trait Tokenizer: Send + Sync {
 }
 
 pub fn from_config(config: TokenizerConfig) -> Result<Box<dyn Tokenizer>, String> {
-    match &config.strategy {
+    match config.strategy.clone() {
         TokenizerStrategy::Whitespace => Ok(Box::new(WhitespaceTokenizer::new(config))),
         TokenizerStrategy::Unicode => Ok(Box::new(UnicodeTokenizer::new(config))),
         TokenizerStrategy::Pattern { regex } => {
-            let regex_clone = regex.clone();
-            PatternTokenizer::new(&regex_clone, config)
+            PatternTokenizer::new(&regex, config)
                 .map(|t| Box::new(t) as Box<dyn Tokenizer>)
         }
+        TokenizerStrategy::Sentence => Ok(Box::new(SentenceTokenizer::new(config))),
+        TokenizerStrategy::Grapheme { extended } => {
+            Ok(Box::new(GraphemeTokenizer::new(config, extended)))
+        }
+        TokenizerStrategy::Keyword => Ok(Box::new(KeywordTokenizer::new(config))),
     }
 }
 
