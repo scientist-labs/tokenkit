@@ -2,7 +2,37 @@
 
 Fast, Rust-backed word-level tokenization for Ruby with pattern preservation.
 
-TokenKit provides lightweight, Unicode-aware tokenization designed for NLP pipelines, search applications, and text processing where you need consistent, high-quality word segmentation.
+TokenKit is a Ruby wrapper around Rust's [unicode-segmentation](https://github.com/unicode-rs/unicode-segmentation) crate, providing lightweight, Unicode-aware tokenization designed for NLP pipelines, search applications, and text processing where you need consistent, high-quality word segmentation.
+
+## Quickstart
+
+```ruby
+# Install the gem
+gem install tokenkit
+
+# Or add to your Gemfile
+gem 'tokenkit'
+```
+
+```ruby
+require 'tokenkit'
+
+# Basic tokenization - handles Unicode, contractions, accents
+TokenKit.tokenize("Hello, world! café can't")
+# => ["hello", "world", "café", "can't"]
+
+# Preserve domain-specific terms even when lowercasing
+TokenKit.configure do |config|
+  config.lowercase = true
+  config.preserve_patterns = [
+    /\d+ug/i,           # Measurements: 100ug
+    /[A-Z][A-Z0-9]+/    # Gene names: BRCA1, TP53
+  ]
+end
+
+TokenKit.tokenize("Patient received 100ug for BRCA1 study")
+# => ["patient", "received", "100ug", "for", "BRCA1", "study"]
+```
 
 ## Features
 
@@ -12,38 +42,6 @@ TokenKit provides lightweight, Unicode-aware tokenization designed for NLP pipel
 - **Thread-safe**: Safe for concurrent use
 - **Simple API**: Configure once, use everywhere
 - **Zero dependencies**: Pure Ruby API with Rust extension
-
-## Installation
-
-Add to your Gemfile:
-
-```ruby
-gem 'tokenkit'
-```
-
-Or install directly:
-
-```bash
-gem install tokenkit
-```
-
-## Quick Start
-
-```ruby
-require 'tokenkit'
-
-# Basic tokenization (uses Unicode word boundaries)
-tokens = TokenKit.tokenize("Hello, world!")
-# => ["hello", "world"]
-
-# Handles Unicode properly
-tokens = TokenKit.tokenize("café résumé naïve")
-# => ["café", "résumé", "naïve"]
-
-# Handles contractions
-tokens = TokenKit.tokenize("can't won't shouldn't")
-# => ["can't", "won't", "shouldn't"]
-```
 
 ## Tokenization Strategies
 
