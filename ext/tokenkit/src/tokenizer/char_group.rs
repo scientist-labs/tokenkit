@@ -9,6 +9,8 @@ pub struct CharGroupTokenizer {
 
 impl CharGroupTokenizer {
     pub fn new(config: TokenizerConfig, split_on_chars: String) -> Self {
+        // Note: Empty split_on_chars is valid - it makes the tokenizer behave like
+        // a keyword tokenizer (no splitting, returns whole text as single token)
         let split_chars: HashSet<char> = split_on_chars.chars().collect();
         Self {
             config,
