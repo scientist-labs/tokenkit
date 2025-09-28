@@ -4,6 +4,9 @@ mod pattern;
 mod sentence;
 mod grapheme;
 mod keyword;
+mod edge_ngram;
+mod path_hierarchy;
+mod url_email;
 
 pub use whitespace::WhitespaceTokenizer;
 pub use unicode::UnicodeTokenizer;
@@ -11,6 +14,9 @@ pub use pattern::PatternTokenizer;
 pub use sentence::SentenceTokenizer;
 pub use grapheme::GraphemeTokenizer;
 pub use keyword::KeywordTokenizer;
+pub use edge_ngram::EdgeNgramTokenizer;
+pub use path_hierarchy::PathHierarchyTokenizer;
+pub use url_email::UrlEmailTokenizer;
 
 use crate::config::{TokenizerConfig, TokenizerStrategy};
 use regex::Regex;
@@ -33,6 +39,15 @@ pub fn from_config(config: TokenizerConfig) -> Result<Box<dyn Tokenizer>, String
             Ok(Box::new(GraphemeTokenizer::new(config, extended)))
         }
         TokenizerStrategy::Keyword => Ok(Box::new(KeywordTokenizer::new(config))),
+        TokenizerStrategy::EdgeNgram { min_gram, max_gram } => {
+            Ok(Box::new(EdgeNgramTokenizer::new(config, min_gram, max_gram)))
+        }
+        TokenizerStrategy::PathHierarchy { delimiter } => {
+            Ok(Box::new(PathHierarchyTokenizer::new(config, delimiter)))
+        }
+        TokenizerStrategy::UrlEmail => {
+            Ok(Box::new(UrlEmailTokenizer::new(config)))
+        }
     }
 }
 
@@ -118,7 +133,15 @@ fn tokenize_simple(text: &str) -> Vec<String> {
         .collect()
 }
 
-pub(crate) fn post_process(mut tokens: Vec<String>, config: &TokenizerConfig) -> Vec<String> {
+pub(crate) fn post_process(tokens: Vec<String>, config: &TokenizerConfig) -> Vec<String> {
+    post_process_with_preserved(tokens, config, None)
+}
+
+pub(crate) fn post_process_with_preserved(
+    mut tokens: Vec<String>,
+    config: &TokenizerConfig,
+    preserve_chars: Option<&str>,
+) -> Vec<String> {
     if config.lowercase {
         tokens = tokens.into_iter().map(|t| t.to_lowercase()).collect();
     }
@@ -128,7 +151,14 @@ pub(crate) fn post_process(mut tokens: Vec<String>, config: &TokenizerConfig) ->
             .into_iter()
             .map(|t| {
                 t.chars()
-                    .filter(|c| !c.is_ascii_punctuation())
+                    .filter(|c| {
+                        if let Some(preserved) = preserve_chars {
+                            if preserved.contains(*c) {
+                                return true;
+                            }
+                        }
+                        !c.is_ascii_punctuation()
+                    })
                     .collect()
             })
             .filter(|s: &String| !s.is_empty())

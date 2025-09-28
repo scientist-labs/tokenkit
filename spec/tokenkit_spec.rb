@@ -97,15 +97,16 @@ RSpec.describe TokenKit do
   describe ".config_hash" do
     after { TokenKit.reset }
 
-    it "returns configuration as hash" do
+    it "returns configuration as Configuration object" do
       TokenKit.configure do |config|
         config.strategy = :unicode
         config.lowercase = true
       end
 
-      hash = TokenKit.config_hash
-      expect(hash["strategy"]).to eq("unicode")
-      expect(hash["lowercase"]).to eq(true)
+      config = TokenKit.config_hash
+      expect(config).to be_a(TokenKit::Configuration)
+      expect(config.strategy).to eq(:unicode)
+      expect(config.lowercase).to eq(true)
     end
   end
 

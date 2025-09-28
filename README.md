@@ -36,7 +36,7 @@ TokenKit.tokenize("Patient received 100ug for BRCA1 study")
 
 ## Features
 
-- **Six tokenization strategies**: whitespace, unicode (recommended), custom regex patterns, sentence, grapheme, and keyword
+- **Nine tokenization strategies**: whitespace, unicode (recommended), custom regex patterns, sentence, grapheme, keyword, edge n-gram, path hierarchy, and URL/email-aware
 - **Pattern preservation**: Keep domain-specific terms (gene names, measurements, antibodies) intact even with case normalization
 - **Fast**: Rust-backed implementation (~100K docs/sec)
 - **Thread-safe**: Safe for concurrent use
@@ -137,6 +137,61 @@ TokenKit.tokenize("PROD-2024-ABC-001")
 
 Ideal for exact matching of SKUs, IDs, product codes, or category names where splitting would lose meaning.
 
+### Edge N-gram (Search-as-you-type)
+
+Generates prefixes from the beginning of words for autocomplete functionality:
+
+```ruby
+TokenKit.configure do |config|
+  config.strategy = :edge_ngram
+  config.min_gram = 2        # Minimum prefix length
+  config.max_gram = 10       # Maximum prefix length
+  config.lowercase = true
+end
+
+TokenKit.tokenize("laptop")
+# => ["la", "lap", "lapt", "lapto", "laptop"]
+```
+
+Essential for autocomplete, type-ahead search, and prefix matching. At index time, generate edge n-grams of your product names or search terms.
+
+### Path Hierarchy (Hierarchical Navigation)
+
+Creates tokens for each level of a path hierarchy:
+
+```ruby
+TokenKit.configure do |config|
+  config.strategy = :path_hierarchy
+  config.delimiter = "/"     # Use "\\" for Windows paths
+  config.lowercase = false
+end
+
+TokenKit.tokenize("/usr/local/bin/ruby")
+# => ["/usr", "/usr/local", "/usr/local/bin", "/usr/local/bin/ruby"]
+
+# Works for category hierarchies too
+TokenKit.tokenize("electronics/computers/laptops")
+# => ["electronics", "electronics/computers", "electronics/computers/laptops"]
+```
+
+Perfect for filesystem paths, URL structures, category hierarchies, and breadcrumb navigation.
+
+### URL/Email-Aware (Web Content)
+
+Preserves URLs and email addresses as single tokens while tokenizing surrounding text:
+
+```ruby
+TokenKit.configure do |config|
+  config.strategy = :url_email
+  config.lowercase = true
+end
+
+TokenKit.tokenize("Contact support@example.com or visit https://example.com")
+# => ["contact", "support@example.com", "or", "visit", "https://example.com"]
+```
+
+Essential for user-generated content, customer support messages, product descriptions with links, and social media text.
+
 ## Pattern Preservation
 
 Preserve domain-specific terms even when lowercasing:
@@ -159,18 +214,66 @@ tokens = TokenKit.tokenize(text)
 
 Pattern matches maintain their original case despite `lowercase=true`.
 
+### Regex Flags
+
+TokenKit supports Ruby regex flags for both `preserve_patterns` and the `:pattern` strategy:
+
+```ruby
+# Case-insensitive matching (i flag)
+TokenKit.configure do |config|
+  config.preserve_patterns = [/gene-\d+/i]
+end
+
+TokenKit.tokenize("Found GENE-123 and gene-456")
+# => ["found", "GENE-123", "and", "gene-456"]
+
+# Multiline mode (m flag) - dot matches newlines
+TokenKit.configure do |config|
+  config.strategy = :pattern
+  config.regex = /test./m
+end
+
+# Extended mode (x flag) - allows comments and whitespace
+pattern = /
+  \w+       # word characters
+  @         # at sign
+  \w+\.\w+  # domain.tld
+/x
+
+TokenKit.configure do |config|
+  config.preserve_patterns = [pattern]
+end
+
+# Combine flags
+TokenKit.configure do |config|
+  config.preserve_patterns = [/code-\d+/im]  # case-insensitive + multiline
+end
+```
+
+Supported flags:
+- `i` - Case-insensitive matching
+- `m` - Multiline mode (`.` matches newlines)
+- `x` - Extended mode (ignore whitespace, allow comments)
+
+Flags work with both Regexp objects and string patterns passed to `:pattern` strategy.
+
 ## Configuration
 
 ### Global Configuration
 
 ```ruby
 TokenKit.configure do |config|
-  config.strategy = :unicode              # :whitespace, :unicode, :pattern, :sentence, :grapheme, :keyword
+  config.strategy = :unicode              # :whitespace, :unicode, :pattern, :sentence, :grapheme, :keyword, :edge_ngram, :path_hierarchy, :url_email
   config.lowercase = true                 # Normalize to lowercase
   config.remove_punctuation = false       # Remove punctuation from tokens
   config.preserve_patterns = []           # Regex patterns to preserve
+
+  # Strategy-specific options
   config.regex = /\w+/                    # Only for :pattern strategy
   config.grapheme_extended = true         # Only for :grapheme strategy (default: true)
+  config.min_gram = 2                     # Only for :edge_ngram strategy (default: 2)
+  config.max_gram = 10                    # Only for :edge_ngram strategy (default: 10)
+  config.delimiter = "/"                  # Only for :path_hierarchy strategy (default: "/")
 end
 ```
 
@@ -179,24 +282,61 @@ end
 Override global config for specific calls:
 
 ```ruby
-# Global: lowercase=true
-TokenKit.configure { |c| c.lowercase = true }
-
-# Override for one call
-tokens = TokenKit.tokenize("BRCA1 Gene", lowercase: false)
+# Override general options
+TokenKit.tokenize("BRCA1 Gene", lowercase: false)
 # => ["BRCA1", "Gene"]
+
+# Override strategy-specific options
+TokenKit.tokenize("laptop", strategy: :edge_ngram, min_gram: 3, max_gram: 5)
+# => ["lap", "lapt", "lapto"]
+
+TokenKit.tokenize("C:\\Windows\\System", strategy: :path_hierarchy, delimiter: "\\")
+# => ["C:", "C:\\Windows", "C:\\Windows\\System"]
+
+# Combine multiple overrides
+TokenKit.tokenize(
+  "TEST",
+  strategy: :edge_ngram,
+  min_gram: 2,
+  max_gram: 3,
+  lowercase: false
+)
+# => ["TE", "TES"]
 ```
+
+All strategy-specific options can be overridden per-call:
+- `:pattern` - `regex: /pattern/`
+- `:grapheme` - `extended: true/false`
+- `:edge_ngram` - `min_gram: n, max_gram: n`
+- `:path_hierarchy` - `delimiter: "/"`
 
 ### Get Current Config
 
 ```ruby
 config = TokenKit.config_hash
-# => {
-#   "strategy" => "unicode",
-#   "lowercase" => true,
-#   "remove_punctuation" => false,
-#   "preserve_patterns" => ["\\d+ug"]
-# }
+# Returns a Configuration object with accessor methods
+
+config.strategy           # => :unicode
+config.lowercase          # => true
+config.remove_punctuation # => false
+config.preserve_patterns  # => [...]
+
+# Strategy predicates
+config.edge_ngram?        # => false
+config.pattern?           # => false
+config.grapheme?          # => false
+config.path_hierarchy?    # => false
+
+# Strategy-specific accessors
+config.min_gram           # => 2 (for edge_ngram)
+config.max_gram           # => 10 (for edge_ngram)
+config.delimiter          # => "/" (for path_hierarchy)
+config.extended           # => true (for grapheme)
+config.regex              # => "..." (for pattern)
+
+# Convert to hash if needed
+config.to_h
+# => {"strategy" => "unicode", "lowercase" => true, ...}
 ```
 
 ### Reset to Defaults
@@ -312,4 +452,5 @@ This project is intended to be a safe, welcoming space for collaboration, and co
 Built with:
 - [Magnus](https://github.com/matsadler/magnus) for Ruby-Rust bindings
 - [unicode-segmentation](https://github.com/unicode-rs/unicode-segmentation) for Unicode word boundaries
+- [linkify](https://github.com/robinst/linkify) for robust URL and email detection
 - [regex](https://github.com/rust-lang/regex) for pattern matching

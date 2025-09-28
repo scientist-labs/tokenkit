@@ -34,11 +34,21 @@ module TokenKit
     }
 
     if Config.instance.strategy == :pattern && Config.instance.regex
-      config_hash["regex"] = Config.instance.regex
+      regex = Config.instance.regex
+      config_hash["regex"] = regex.is_a?(Regexp) ? regex_to_rust(regex) : regex.to_s
     end
 
     if Config.instance.strategy == :grapheme
       config_hash["extended"] = Config.instance.grapheme_extended
+    end
+
+    if Config.instance.strategy == :edge_ngram
+      config_hash["min_gram"] = Config.instance.min_gram
+      config_hash["max_gram"] = Config.instance.max_gram
+    end
+
+    if Config.instance.strategy == :path_hierarchy
+      config_hash["delimiter"] = Config.instance.delimiter
     end
 
     _configure(config_hash)
@@ -55,10 +65,13 @@ module TokenKit
     Config.instance.instance_variable_set(:@remove_punctuation, false)
     Config.instance.instance_variable_set(:@preserve_patterns, [])
     Config.instance.instance_variable_set(:@grapheme_extended, true)
+    Config.instance.instance_variable_set(:@min_gram, 2)
+    Config.instance.instance_variable_set(:@max_gram, 10)
+    Config.instance.instance_variable_set(:@delimiter, "/")
   end
 
   def config_hash
-    _config_hash
+    Configuration.new(_config_hash)
   end
 
   private
@@ -87,11 +100,17 @@ module TokenKit
 
   def normalize_options(opts)
     normalized = {}
+
+    [:extended, :min_gram, :max_gram, :delimiter, :lowercase, :remove_punctuation].each do |key|
+      normalized[key.to_s] = opts[key] if opts.key?(key)
+    end
+
     normalized["strategy"] = opts[:strategy].to_s if opts[:strategy]
-    normalized["regex"] = opts[:regex] if opts[:regex]
-    normalized["extended"] = opts[:extended] if opts.key?(:extended)
-    normalized["lowercase"] = opts[:lowercase] if opts.key?(:lowercase)
-    normalized["remove_punctuation"] = opts[:remove_punctuation] if opts.key?(:remove_punctuation)
+
+    if opts[:regex]
+      regex = opts[:regex]
+      normalized["regex"] = regex.is_a?(Regexp) ? regex_to_rust(regex) : regex.to_s
+    end
 
     if opts[:preserve]
       normalized["preserve_patterns"] = Array(opts[:preserve]).map do |pattern|
@@ -124,3 +143,4 @@ module TokenKit
 end
 
 require_relative "tokenkit/config"
+require_relative "tokenkit/configuration"

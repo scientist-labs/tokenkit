@@ -1,6 +1,6 @@
 module TokenKit
   class Config
-    attr_accessor :strategy, :regex, :grapheme_extended, :lowercase, :remove_punctuation, :preserve_patterns
+    attr_accessor :strategy, :regex, :grapheme_extended, :min_gram, :max_gram, :delimiter, :lowercase, :remove_punctuation, :preserve_patterns
 
     def self.instance
       @instance ||= new
@@ -12,6 +12,9 @@ module TokenKit
       @remove_punctuation = false
       @preserve_patterns = []
       @grapheme_extended = true
+      @min_gram = 2
+      @max_gram = 10
+      @delimiter = "/"
     end
 
     def apply!
@@ -30,6 +33,15 @@ module TokenKit
         config_hash["extended"] = grapheme_extended
       end
 
+      if strategy == :edge_ngram
+        config_hash["min_gram"] = min_gram
+        config_hash["max_gram"] = max_gram
+      end
+
+      if strategy == :path_hierarchy
+        config_hash["delimiter"] = delimiter
+      end
+
       TokenKit.configure(config_hash)
     end
 
@@ -38,6 +50,9 @@ module TokenKit
         strategy: strategy,
         regex: regex,
         grapheme_extended: grapheme_extended,
+        min_gram: min_gram,
+        max_gram: max_gram,
+        delimiter: delimiter,
         lowercase: lowercase,
         remove_punctuation: remove_punctuation,
         preserve_patterns: preserve_patterns
