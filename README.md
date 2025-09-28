@@ -36,7 +36,7 @@ TokenKit.tokenize("Patient received 100ug for BRCA1 study")
 
 ## Features
 
-- **Six tokenization strategies**: whitespace, unicode (recommended), custom regex patterns, sentence, grapheme, and keyword
+- **Nine tokenization strategies**: whitespace, unicode (recommended), custom regex patterns, sentence, grapheme, keyword, edge n-gram, path hierarchy, and URL/email-aware
 - **Pattern preservation**: Keep domain-specific terms (gene names, measurements, antibodies) intact even with case normalization
 - **Fast**: Rust-backed implementation (~100K docs/sec)
 - **Thread-safe**: Safe for concurrent use
@@ -137,6 +137,61 @@ TokenKit.tokenize("PROD-2024-ABC-001")
 
 Ideal for exact matching of SKUs, IDs, product codes, or category names where splitting would lose meaning.
 
+### Edge N-gram (Search-as-you-type)
+
+Generates prefixes from the beginning of words for autocomplete functionality:
+
+```ruby
+TokenKit.configure do |config|
+  config.strategy = :edge_ngram
+  config.min_gram = 2        # Minimum prefix length
+  config.max_gram = 10       # Maximum prefix length
+  config.lowercase = true
+end
+
+TokenKit.tokenize("laptop")
+# => ["la", "lap", "lapt", "lapto", "laptop"]
+```
+
+Essential for autocomplete, type-ahead search, and prefix matching. At index time, generate edge n-grams of your product names or search terms.
+
+### Path Hierarchy (Hierarchical Navigation)
+
+Creates tokens for each level of a path hierarchy:
+
+```ruby
+TokenKit.configure do |config|
+  config.strategy = :path_hierarchy
+  config.delimiter = "/"     # Use "\\" for Windows paths
+  config.lowercase = false
+end
+
+TokenKit.tokenize("/usr/local/bin/ruby")
+# => ["/usr", "/usr/local", "/usr/local/bin", "/usr/local/bin/ruby"]
+
+# Works for category hierarchies too
+TokenKit.tokenize("electronics/computers/laptops")
+# => ["electronics", "electronics/computers", "electronics/computers/laptops"]
+```
+
+Perfect for filesystem paths, URL structures, category hierarchies, and breadcrumb navigation.
+
+### URL/Email-Aware (Web Content)
+
+Preserves URLs and email addresses as single tokens while tokenizing surrounding text:
+
+```ruby
+TokenKit.configure do |config|
+  config.strategy = :url_email
+  config.lowercase = true
+end
+
+TokenKit.tokenize("Contact support@example.com or visit https://example.com")
+# => ["contact", "support@example.com", "or", "visit", "https://example.com"]
+```
+
+Essential for user-generated content, customer support messages, product descriptions with links, and social media text.
+
 ## Pattern Preservation
 
 Preserve domain-specific terms even when lowercasing:
@@ -165,12 +220,17 @@ Pattern matches maintain their original case despite `lowercase=true`.
 
 ```ruby
 TokenKit.configure do |config|
-  config.strategy = :unicode              # :whitespace, :unicode, :pattern, :sentence, :grapheme, :keyword
+  config.strategy = :unicode              # :whitespace, :unicode, :pattern, :sentence, :grapheme, :keyword, :edge_ngram, :path_hierarchy, :url_email
   config.lowercase = true                 # Normalize to lowercase
   config.remove_punctuation = false       # Remove punctuation from tokens
   config.preserve_patterns = []           # Regex patterns to preserve
+
+  # Strategy-specific options
   config.regex = /\w+/                    # Only for :pattern strategy
   config.grapheme_extended = true         # Only for :grapheme strategy (default: true)
+  config.min_gram = 2                     # Only for :edge_ngram strategy (default: 2)
+  config.max_gram = 10                    # Only for :edge_ngram strategy (default: 10)
+  config.delimiter = "/"                  # Only for :path_hierarchy strategy (default: "/")
 end
 ```
 

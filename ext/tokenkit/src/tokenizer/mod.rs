@@ -4,6 +4,9 @@ mod pattern;
 mod sentence;
 mod grapheme;
 mod keyword;
+mod edge_ngram;
+mod path_hierarchy;
+mod url_email;
 
 pub use whitespace::WhitespaceTokenizer;
 pub use unicode::UnicodeTokenizer;
@@ -11,6 +14,9 @@ pub use pattern::PatternTokenizer;
 pub use sentence::SentenceTokenizer;
 pub use grapheme::GraphemeTokenizer;
 pub use keyword::KeywordTokenizer;
+pub use edge_ngram::EdgeNgramTokenizer;
+pub use path_hierarchy::PathHierarchyTokenizer;
+pub use url_email::UrlEmailTokenizer;
 
 use crate::config::{TokenizerConfig, TokenizerStrategy};
 use regex::Regex;
@@ -33,6 +39,16 @@ pub fn from_config(config: TokenizerConfig) -> Result<Box<dyn Tokenizer>, String
             Ok(Box::new(GraphemeTokenizer::new(config, extended)))
         }
         TokenizerStrategy::Keyword => Ok(Box::new(KeywordTokenizer::new(config))),
+        TokenizerStrategy::EdgeNgram { min_gram, max_gram } => {
+            Ok(Box::new(EdgeNgramTokenizer::new(config, min_gram, max_gram)))
+        }
+        TokenizerStrategy::PathHierarchy { delimiter } => {
+            Ok(Box::new(PathHierarchyTokenizer::new(config, delimiter)))
+        }
+        TokenizerStrategy::UrlEmail => {
+            UrlEmailTokenizer::new(config)
+                .map(|t| Box::new(t) as Box<dyn Tokenizer>)
+        }
     }
 }
 

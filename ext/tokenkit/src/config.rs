@@ -16,6 +16,9 @@ pub enum TokenizerStrategy {
     Sentence,
     Grapheme { extended: bool },
     Keyword,
+    EdgeNgram { min_gram: usize, max_gram: usize },
+    PathHierarchy { delimiter: String },
+    UrlEmail,
 }
 
 impl Default for TokenizerConfig {

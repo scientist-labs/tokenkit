@@ -41,6 +41,15 @@ module TokenKit
       config_hash["extended"] = Config.instance.grapheme_extended
     end
 
+    if Config.instance.strategy == :edge_ngram
+      config_hash["min_gram"] = Config.instance.min_gram
+      config_hash["max_gram"] = Config.instance.max_gram
+    end
+
+    if Config.instance.strategy == :path_hierarchy
+      config_hash["delimiter"] = Config.instance.delimiter
+    end
+
     _configure(config_hash)
   end
 
@@ -55,6 +64,9 @@ module TokenKit
     Config.instance.instance_variable_set(:@remove_punctuation, false)
     Config.instance.instance_variable_set(:@preserve_patterns, [])
     Config.instance.instance_variable_set(:@grapheme_extended, true)
+    Config.instance.instance_variable_set(:@min_gram, 2)
+    Config.instance.instance_variable_set(:@max_gram, 10)
+    Config.instance.instance_variable_set(:@delimiter, "/")
   end
 
   def config_hash
@@ -90,6 +102,9 @@ module TokenKit
     normalized["strategy"] = opts[:strategy].to_s if opts[:strategy]
     normalized["regex"] = opts[:regex] if opts[:regex]
     normalized["extended"] = opts[:extended] if opts.key?(:extended)
+    normalized["min_gram"] = opts[:min_gram] if opts.key?(:min_gram)
+    normalized["max_gram"] = opts[:max_gram] if opts.key?(:max_gram)
+    normalized["delimiter"] = opts[:delimiter] if opts.key?(:delimiter)
     normalized["lowercase"] = opts[:lowercase] if opts.key?(:lowercase)
     normalized["remove_punctuation"] = opts[:remove_punctuation] if opts.key?(:remove_punctuation)
 
