@@ -156,4 +156,28 @@ RSpec.describe "Letter Tokenizer" do
       expect(tokens).to eq(["test", "done"])
     end
   end
+
+  context "emoji handling" do
+    it "treats emoji as non-alphabetic characters" do
+      tokens = TokenKit.tokenize("hello🔥world", strategy: :letter)
+      # Emoji should split the text
+      expect(tokens).to eq(["hello", "world"])
+    end
+
+    it "handles multiple emoji" do
+      tokens = TokenKit.tokenize("test😀😂done", strategy: :letter)
+      expect(tokens).to eq(["test", "done"])
+    end
+
+    it "handles emoji with text" do
+      tokens = TokenKit.tokenize("I❤️Ruby", strategy: :letter, lowercase: false)
+      expect(tokens).to eq(["I", "Ruby"])
+    end
+
+    it "handles only emoji" do
+      tokens = TokenKit.tokenize("🔥🎉🚀", strategy: :letter)
+      expect(tokens).to eq([])
+    end
+  end
+
 end

@@ -194,4 +194,28 @@ RSpec.describe "Lowercase Tokenizer" do
       expect(lowercase_tokens).to eq(letter_tokens)
     end
   end
+
+  context "emoji handling" do
+    it "treats emoji as non-alphabetic characters and lowercases" do
+      tokens = TokenKit.tokenize("HELLO🔥WORLD", strategy: :lowercase)
+      # Emoji should split the text, and text should be lowercased
+      expect(tokens).to eq(["hello", "world"])
+    end
+
+    it "handles multiple emoji with mixed case" do
+      tokens = TokenKit.tokenize("TEST😀😂Done", strategy: :lowercase)
+      expect(tokens).to eq(["test", "done"])
+    end
+
+    it "handles emoji with text" do
+      tokens = TokenKit.tokenize("I❤️RUBY", strategy: :lowercase)
+      expect(tokens).to eq(["i", "ruby"])
+    end
+
+    it "handles only emoji" do
+      tokens = TokenKit.tokenize("🔥🎉🚀", strategy: :lowercase)
+      expect(tokens).to eq([])
+    end
+  end
+
 end

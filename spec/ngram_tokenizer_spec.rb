@@ -164,5 +164,22 @@ RSpec.describe "N-gram Tokenizer" do
       tokens = TokenKit.tokenize("test", strategy: :ngram, min_gram: 2, max_gram: 3)
       expect(tokens).to eq(["te", "es", "st", "tes", "est"])
     end
+
+    it "handles min_gram = max_gram" do
+      tokens = TokenKit.tokenize("test", strategy: :ngram, min_gram: 2, max_gram: 2)
+      expect(tokens).to eq(["te", "es", "st"])
+    end
   end
+
+  context "performance with long words" do
+    it "handles very long words efficiently" do
+      long_word = "a" * 100
+      tokens = TokenKit.tokenize(long_word, strategy: :ngram, min_gram: 2, max_gram: 3)
+      # Should generate 99 bigrams + 98 trigrams = 197 n-grams
+      expect(tokens.size).to eq(197)
+      expect(tokens.first).to eq("aa")
+      expect(tokens.last).to eq("aaa")
+    end
+  end
+
 end

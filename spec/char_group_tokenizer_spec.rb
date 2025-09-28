@@ -213,5 +213,24 @@ RSpec.describe "Character Group Tokenizer" do
       )
       expect(tokens).to eq(["a", "b", "c"])
     end
+
+    it "handles Unicode split characters" do
+      tokens = TokenKit.tokenize(
+        "北京、上海、深圳",  # Chinese comma (、U+3001)
+        strategy: :char_group,
+        split_on_chars: "、"
+      )
+      expect(tokens).to eq(["北京", "上海", "深圳"])
+    end
+
+    it "handles mixed ASCII and Unicode separators" do
+      tokens = TokenKit.tokenize(
+        "item1,item2、item3;item4",
+        strategy: :char_group,
+        split_on_chars: ",、;"
+      )
+      expect(tokens).to eq(["item1", "item2", "item3", "item4"])
+    end
   end
+
 end

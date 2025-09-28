@@ -161,5 +161,21 @@ RSpec.describe "Edge N-gram Tokenizer" do
       tokens = TokenKit.tokenize("test", strategy: :edge_ngram, min_gram: 2, max_gram: 3)
       expect(tokens).to eq(["te", "tes"])
     end
+
+    it "handles min_gram = max_gram" do
+      tokens = TokenKit.tokenize("test", strategy: :edge_ngram, min_gram: 2, max_gram: 2)
+      expect(tokens).to eq(["te"])
+    end
   end
+
+  context "performance with long words" do
+    it "handles very long words efficiently" do
+      long_word = "a" * 100
+      tokens = TokenKit.tokenize(long_word, strategy: :edge_ngram, min_gram: 2, max_gram: 5)
+      # Should generate only prefixes: 2, 3, 4, 5 chars = 4 tokens
+      expect(tokens.size).to eq(4)
+      expect(tokens).to eq(["aa", "aaa", "aaaa", "aaaaa"])
+    end
+  end
+
 end
