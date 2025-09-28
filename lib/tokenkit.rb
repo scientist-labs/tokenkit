@@ -30,7 +30,7 @@ module TokenKit
       "strategy" => Config.instance.strategy.to_s,
       "lowercase" => Config.instance.lowercase,
       "remove_punctuation" => Config.instance.remove_punctuation,
-      "preserve_patterns" => Config.instance.preserve_patterns.map { |p| p.is_a?(Regexp) ? p.source : p.to_s }
+      "preserve_patterns" => Config.instance.preserve_patterns.map { |p| p.is_a?(Regexp) ? regex_to_rust(p) : p.to_s }
     }
 
     if Config.instance.strategy == :pattern && Config.instance.regex
@@ -58,6 +58,19 @@ module TokenKit
 
   private
 
+  def regex_to_rust(pattern)
+    flags = ""
+    flags += "i" if (pattern.options & Regexp::IGNORECASE) != 0
+    flags += "m" if (pattern.options & Regexp::MULTILINE) != 0
+    flags += "x" if (pattern.options & Regexp::EXTENDED) != 0
+
+    if flags.empty?
+      pattern.source
+    else
+      "(?#{flags})#{pattern.source}"
+    end
+  end
+
   def with_temporary_config(opts)
     previous_config = _config_hash
     temp_config = previous_config.merge(normalize_options(opts))
@@ -76,7 +89,7 @@ module TokenKit
 
     if opts[:preserve]
       normalized["preserve_patterns"] = Array(opts[:preserve]).map do |pattern|
-        pattern.is_a?(Regexp) ? pattern.source : pattern.to_s
+        pattern.is_a?(Regexp) ? regex_to_rust(pattern) : pattern.to_s
       end
     end
 

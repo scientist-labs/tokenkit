@@ -31,8 +31,7 @@ impl Tokenizer for UnicodeTokenizer {
                 .map(|s| s.to_string())
                 .collect();
 
-            let tokens = apply_preserve_patterns(tokens, &self.preserve_patterns, text);
-            return post_process(tokens, &self.config);
+            return apply_preserve_patterns(tokens, &self.preserve_patterns, text, &self.config);
         }
 
         let tokens: Vec<String> = text
