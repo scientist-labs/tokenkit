@@ -26,6 +26,34 @@ pub fn from_config(config: TokenizerConfig) -> Result<Box<dyn Tokenizer>, String
     }
 }
 
+fn merge_overlapping_spans(mut spans: Vec<(usize, usize, String)>) -> Vec<(usize, usize, String)> {
+    if spans.is_empty() {
+        return spans;
+    }
+
+    spans.sort_by(|a, b| {
+        a.0.cmp(&b.0)
+            .then_with(|| b.1.cmp(&a.1))
+    });
+
+    let mut merged = Vec::new();
+    let mut current = spans[0].clone();
+
+    for span in spans.into_iter().skip(1) {
+        if span.0 < current.1 {
+            if span.1 > current.1 {
+                current = span;
+            }
+        } else {
+            merged.push(current);
+            current = span;
+        }
+    }
+    merged.push(current);
+
+    merged
+}
+
 pub(crate) fn apply_preserve_patterns(
     tokens: Vec<String>,
     preserve_patterns: &[Regex],
@@ -46,15 +74,17 @@ pub(crate) fn apply_preserve_patterns(
         return tokens;
     }
 
-    preserved_spans.sort_by_key(|(start, _, _)| *start);
+    let preserved_spans = merge_overlapping_spans(preserved_spans);
 
     let mut result = Vec::new();
     let mut pos = 0;
 
     for (start, end, preserved) in preserved_spans {
-        let before = &original_text[pos..start];
-        let before_tokens = tokenize_simple(before);
-        result.extend(before_tokens);
+        if start > pos {
+            let before = &original_text[pos..start];
+            let before_tokens = tokenize_simple(before);
+            result.extend(before_tokens);
+        }
         result.push(preserved);
         pos = end;
     }
