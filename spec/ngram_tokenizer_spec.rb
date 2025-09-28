@@ -1,0 +1,137 @@
+# frozen_string_literal: true
+
+RSpec.describe "N-gram Tokenizer" do
+  before do
+    TokenKit.configure do |config|
+      config.strategy = :ngram
+      config.min_gram = 2
+      config.max_gram = 3
+      config.lowercase = true
+    end
+  end
+
+  after { TokenKit.reset }
+
+  it "generates n-grams from single word" do
+    tokens = TokenKit.tokenize("quick")
+    expect(tokens).to contain_exactly("qu", "ui", "ic", "ck", "qui", "uic", "ick")
+  end
+
+  it "generates n-grams from multiple words" do
+    tokens = TokenKit.tokenize("hi there")
+    expect(tokens).to contain_exactly("hi", "th", "he", "er", "re", "the", "her", "ere")
+  end
+
+  it "respects min_gram setting" do
+    TokenKit.configure do |config|
+      config.strategy = :ngram
+      config.min_gram = 3
+      config.max_gram = 4
+      config.lowercase = false
+    end
+
+    tokens = TokenKit.tokenize("test")
+    expect(tokens).to contain_exactly("tes", "est", "test")
+  end
+
+  it "respects max_gram setting" do
+    TokenKit.configure do |config|
+      config.strategy = :ngram
+      config.min_gram = 2
+      config.max_gram = 2
+      config.lowercase = false
+    end
+
+    tokens = TokenKit.tokenize("hello")
+    expect(tokens).to contain_exactly("he", "el", "ll", "lo")
+  end
+
+  it "handles single character words with min_gram > 1" do
+    tokens = TokenKit.tokenize("a")
+    expect(tokens).to eq([])
+  end
+
+  it "returns empty array for empty string" do
+    tokens = TokenKit.tokenize("")
+    expect(tokens).to eq([])
+  end
+
+  it "handles unicode characters" do
+    tokens = TokenKit.tokenize("café")
+    expect(tokens).to include("ca", "af", "fé", "caf", "afé")
+  end
+
+  context "with lowercase option" do
+    it "lowercases the n-grams" do
+      tokens = TokenKit.tokenize("TEST")
+      expect(tokens).to include("te", "es", "st", "tes", "est")
+    end
+  end
+
+  context "with lowercase disabled" do
+    before do
+      TokenKit.configure do |config|
+        config.strategy = :ngram
+        config.min_gram = 2
+        config.max_gram = 3
+        config.lowercase = false
+      end
+    end
+
+    it "preserves original case" do
+      tokens = TokenKit.tokenize("TEST")
+      expect(tokens).to include("TE", "ES", "ST", "TES", "EST")
+    end
+  end
+
+  context "with remove_punctuation option" do
+    before do
+      TokenKit.configure do |config|
+        config.strategy = :ngram
+        config.min_gram = 2
+        config.max_gram = 3
+        config.lowercase = false
+        config.remove_punctuation = true
+      end
+    end
+
+    it "removes punctuation before generating n-grams" do
+      tokens = TokenKit.tokenize("hello!")
+      expect(tokens).to contain_exactly("he", "el", "ll", "lo", "hel", "ell", "llo")
+    end
+  end
+
+  context "fuzzy matching use case" do
+    before do
+      TokenKit.configure do |config|
+        config.strategy = :ngram
+        config.min_gram = 2
+        config.max_gram = 4
+        config.lowercase = true
+      end
+    end
+
+    it "generates n-grams for fuzzy search" do
+      tokens = TokenKit.tokenize("search")
+      # Should match queries like "earch", "searc", "arch", etc.
+      expect(tokens).to include("se", "ea", "ar", "rc", "ch")
+      expect(tokens).to include("sea", "ear", "arc", "rch")
+      expect(tokens).to include("sear", "earc", "arch")
+    end
+  end
+
+  context "misspelling tolerance use case" do
+    it "handles partial matches for misspellings" do
+      # Index time: generate n-grams for "search"
+      tokens = TokenKit.tokenize("search")
+
+      # Query time: user types "serch" (missing 'a')
+      # N-grams of "serch" would overlap significantly with "search"
+      query_tokens = TokenKit.tokenize("serch")
+
+      # Significant overlap between the two sets
+      overlap = (tokens & query_tokens).count
+      expect(overlap).to be > 0
+    end
+  end
+end

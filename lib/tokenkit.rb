@@ -42,13 +42,17 @@ module TokenKit
       config_hash["extended"] = Config.instance.grapheme_extended
     end
 
-    if Config.instance.strategy == :edge_ngram
+    if Config.instance.strategy == :edge_ngram || Config.instance.strategy == :ngram
       config_hash["min_gram"] = Config.instance.min_gram
       config_hash["max_gram"] = Config.instance.max_gram
     end
 
     if Config.instance.strategy == :path_hierarchy
       config_hash["delimiter"] = Config.instance.delimiter
+    end
+
+    if Config.instance.strategy == :char_group
+      config_hash["split_on_chars"] = Config.instance.split_on_chars
     end
 
     _configure(config_hash)
@@ -68,6 +72,7 @@ module TokenKit
     Config.instance.instance_variable_set(:@min_gram, 2)
     Config.instance.instance_variable_set(:@max_gram, 10)
     Config.instance.instance_variable_set(:@delimiter, "/")
+    Config.instance.instance_variable_set(:@split_on_chars, " \t\n\r")
   end
 
   def config_hash
@@ -101,7 +106,7 @@ module TokenKit
   def normalize_options(opts)
     normalized = {}
 
-    [:extended, :min_gram, :max_gram, :delimiter, :lowercase, :remove_punctuation].each do |key|
+    [:extended, :min_gram, :max_gram, :delimiter, :split_on_chars, :lowercase, :remove_punctuation].each do |key|
       normalized[key.to_s] = opts[key] if opts.key?(key)
     end
 

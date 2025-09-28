@@ -17,8 +17,12 @@ pub enum TokenizerStrategy {
     Grapheme { extended: bool },
     Keyword,
     EdgeNgram { min_gram: usize, max_gram: usize },
+    Ngram { min_gram: usize, max_gram: usize },
     PathHierarchy { delimiter: String },
     UrlEmail,
+    CharGroup { split_on_chars: String },
+    Letter,
+    Lowercase,
 }
 
 impl Default for TokenizerConfig {
