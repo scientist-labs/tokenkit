@@ -64,13 +64,40 @@ RSpec.describe "Lowercase Tokenizer" do
     expect(tokens).to eq(["café", "naïve"])
   end
 
-  it "handles characters that lowercase to multiple characters" do
-    # Turkish İ (capital I with dot above, U+0130) lowercases to
-    # 'i' (U+0069) + combining dot above (U+0307) = two characters
-    tokens = TokenKit.tokenize("İSTANBUL")
-    expect(tokens).to eq(["i̇stanbul"])
-    # Verify it's actually two-character lowercasing by checking length
-    expect(tokens.first.chars.count).to eq(9) # i + combining + stanbul = 9 chars
+  context "multi-character lowercasing" do
+    it "handles Turkish İ (capital I with dot above)" do
+      # Turkish İ (U+0130) lowercases to i (U+0069) + combining dot (U+0307)
+      tokens = TokenKit.tokenize("İSTANBUL")
+      expect(tokens).to eq(["i̇stanbul"])
+      expect(tokens.first.chars.count).to eq(9) # i + combining + stanbul = 9 chars
+    end
+
+    it "handles multi-char lowercasing mixed with regular characters" do
+      # İ in the middle of a word
+      tokens = TokenKit.tokenize("TESTİNG")
+      expect(tokens).to eq(["testi̇ng"])
+      expect(tokens.first.chars.count).to eq(8) # t-e-s-t-i̇-n-g (i̇ is 2 chars)
+    end
+
+    it "handles multiple words with multi-char lowercasing" do
+      tokens = TokenKit.tokenize("İSTANBUL İZMİR")
+      expect(tokens).to eq(["i̇stanbul", "i̇zmi̇r"])
+      expect(tokens[0].chars.count).to eq(9) # i̇-s-t-a-n-b-u-l
+      expect(tokens[1].chars.count).to eq(7) # i̇-z-m-i̇-r (two İ characters)
+    end
+
+    it "handles multiple İ characters in one word" do
+      tokens = TokenKit.tokenize("İİ")
+      expect(tokens).to eq(["i̇i̇"])
+      expect(tokens.first.chars.count).to eq(4) # Two i̇ sequences
+    end
+
+    it "handles İ at different positions" do
+      # Start, middle, end
+      tokens = TokenKit.tokenize("İTALİA")
+      expect(tokens).to eq(["i̇tali̇a"])
+      expect(tokens.first.chars.count).to eq(8) # i̇-t-a-l-i̇-a
+    end
   end
 
   it "handles mixed case input" do
