@@ -34,7 +34,8 @@ module TokenKit
     }
 
     if Config.instance.strategy == :pattern && Config.instance.regex
-      config_hash["regex"] = Config.instance.regex
+      regex = Config.instance.regex
+      config_hash["regex"] = regex.is_a?(Regexp) ? regex_to_rust(regex) : regex.to_s
     end
 
     if Config.instance.strategy == :grapheme
@@ -105,7 +106,11 @@ module TokenKit
     end
 
     normalized["strategy"] = opts[:strategy].to_s if opts[:strategy]
-    normalized["regex"] = opts[:regex] if opts[:regex]
+
+    if opts[:regex]
+      regex = opts[:regex]
+      normalized["regex"] = regex.is_a?(Regexp) ? regex_to_rust(regex) : regex.to_s
+    end
 
     if opts[:preserve]
       normalized["preserve_patterns"] = Array(opts[:preserve]).map do |pattern|
