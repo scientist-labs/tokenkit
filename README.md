@@ -214,6 +214,49 @@ tokens = TokenKit.tokenize(text)
 
 Pattern matches maintain their original case despite `lowercase=true`.
 
+### Regex Flags
+
+TokenKit supports Ruby regex flags for both `preserve_patterns` and the `:pattern` strategy:
+
+```ruby
+# Case-insensitive matching (i flag)
+TokenKit.configure do |config|
+  config.preserve_patterns = [/gene-\d+/i]
+end
+
+TokenKit.tokenize("Found GENE-123 and gene-456")
+# => ["found", "GENE-123", "and", "gene-456"]
+
+# Multiline mode (m flag) - dot matches newlines
+TokenKit.configure do |config|
+  config.strategy = :pattern
+  config.regex = /test./m
+end
+
+# Extended mode (x flag) - allows comments and whitespace
+pattern = /
+  \w+       # word characters
+  @         # at sign
+  \w+\.\w+  # domain.tld
+/x
+
+TokenKit.configure do |config|
+  config.preserve_patterns = [pattern]
+end
+
+# Combine flags
+TokenKit.configure do |config|
+  config.preserve_patterns = [/code-\d+/im]  # case-insensitive + multiline
+end
+```
+
+Supported flags:
+- `i` - Case-insensitive matching
+- `m` - Multiline mode (`.` matches newlines)
+- `x` - Extended mode (ignore whitespace, allow comments)
+
+Flags work with both Regexp objects and string patterns passed to `:pattern` strategy.
+
 ## Configuration
 
 ### Global Configuration
@@ -239,24 +282,61 @@ end
 Override global config for specific calls:
 
 ```ruby
-# Global: lowercase=true
-TokenKit.configure { |c| c.lowercase = true }
-
-# Override for one call
-tokens = TokenKit.tokenize("BRCA1 Gene", lowercase: false)
+# Override general options
+TokenKit.tokenize("BRCA1 Gene", lowercase: false)
 # => ["BRCA1", "Gene"]
+
+# Override strategy-specific options
+TokenKit.tokenize("laptop", strategy: :edge_ngram, min_gram: 3, max_gram: 5)
+# => ["lap", "lapt", "lapto"]
+
+TokenKit.tokenize("C:\\Windows\\System", strategy: :path_hierarchy, delimiter: "\\")
+# => ["C:", "C:\\Windows", "C:\\Windows\\System"]
+
+# Combine multiple overrides
+TokenKit.tokenize(
+  "TEST",
+  strategy: :edge_ngram,
+  min_gram: 2,
+  max_gram: 3,
+  lowercase: false
+)
+# => ["TE", "TES"]
 ```
+
+All strategy-specific options can be overridden per-call:
+- `:pattern` - `regex: /pattern/`
+- `:grapheme` - `extended: true/false`
+- `:edge_ngram` - `min_gram: n, max_gram: n`
+- `:path_hierarchy` - `delimiter: "/"`
 
 ### Get Current Config
 
 ```ruby
 config = TokenKit.config_hash
-# => {
-#   "strategy" => "unicode",
-#   "lowercase" => true,
-#   "remove_punctuation" => false,
-#   "preserve_patterns" => ["\\d+ug"]
-# }
+# Returns a Configuration object with accessor methods
+
+config.strategy           # => :unicode
+config.lowercase          # => true
+config.remove_punctuation # => false
+config.preserve_patterns  # => [...]
+
+# Strategy predicates
+config.edge_ngram?        # => false
+config.pattern?           # => false
+config.grapheme?          # => false
+config.path_hierarchy?    # => false
+
+# Strategy-specific accessors
+config.min_gram           # => 2 (for edge_ngram)
+config.max_gram           # => 10 (for edge_ngram)
+config.delimiter          # => "/" (for path_hierarchy)
+config.extended           # => true (for grapheme)
+config.regex              # => "..." (for pattern)
+
+# Convert to hash if needed
+config.to_h
+# => {"strategy" => "unicode", "lowercase" => true, ...}
 ```
 
 ### Reset to Defaults
