@@ -65,7 +65,7 @@ TokenKit.tokenize("Don't worry about café!")
 
 Simple whitespace splitting.
 
-**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
+**✅ Supports `preserve_patterns`**
 
 ```ruby
 TokenKit.configure do |config|
@@ -234,7 +234,7 @@ Essential for user-generated content, customer support messages, product descrip
 
 Splits text based on a custom set of characters (faster than regex for simple delimiters).
 
-**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
+**⚠️ Partially supports `preserve_patterns`** (works best with whitespace delimiters; non-whitespace delimiters may have issues)
 
 ```ruby
 TokenKit.configure do |config|
@@ -257,7 +257,7 @@ Ideal for structured data (CSV, TSV), log parsing, and custom delimiter-based fo
 
 Splits on any non-letter character (simpler than Unicode tokenizer, no special handling for contractions).
 
-**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
+**✅ Supports `preserve_patterns`**
 
 ```ruby
 TokenKit.configure do |config|
@@ -279,7 +279,7 @@ Great for noisy text, mixed scripts, and cases where you want aggressive splitti
 
 Like the Letter tokenizer but always lowercases in a single pass (more efficient than letter + lowercase filter).
 
-**⚠️ Does NOT support `preserve_patterns`** (patterns CANNOT be preserved since this tokenizer always lowercases)
+**✅ Supports `preserve_patterns`** (preserved patterns maintain original case despite always lowercasing)
 
 ```ruby
 TokenKit.configure do |config|
@@ -301,7 +301,9 @@ Perfect for case-insensitive search indexing, normalizing product codes, and cle
 
 ## Pattern Preservation
 
-Preserve domain-specific terms even when lowercasing:
+Preserve domain-specific terms even when lowercasing.
+
+**Supported by:** Unicode, Pattern, Whitespace, Letter, Lowercase, and Character Group (with limitations) tokenizers.
 
 ```ruby
 TokenKit.configure do |config|

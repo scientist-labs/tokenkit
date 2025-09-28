@@ -180,4 +180,74 @@ RSpec.describe "Letter Tokenizer" do
     end
   end
 
+  context "with preserve_patterns" do
+    it "preserves gene names while lowercasing others" do
+      TokenKit.configure do |config|
+        config.strategy = :letter
+        config.lowercase = true
+        config.preserve_patterns = [/BRCA\d/, /TP\d+/]
+      end
+
+      tokens = TokenKit.tokenize("Patient BRCA1 test TP53 done")
+      expect(tokens).to eq(["patient", "BRCA1", "test", "TP53", "done"])
+    end
+
+    it "preserves capitalized terms" do
+      TokenKit.configure do |config|
+        config.strategy = :letter
+        config.lowercase = true
+        config.preserve_patterns = [/[A-Z]{2,}/]
+      end
+
+      tokens = TokenKit.tokenize("The FDA and NIH study")
+      expect(tokens).to eq(["the", "FDA", "and", "NIH", "study"])
+    end
+
+    it "preserves specific patterns within tokens" do
+      TokenKit.configure do |config|
+        config.strategy = :letter
+        config.lowercase = true
+        config.preserve_patterns = [/IgG/, /IgM/]
+      end
+
+      tokens = TokenKit.tokenize("IgG IgM antibodies")
+      expect(tokens).to eq(["IgG", "IgM", "antibodies"])
+    end
+
+    it "preserves patterns that span non-letters" do
+      TokenKit.configure do |config|
+        config.strategy = :letter
+        config.lowercase = true
+        config.preserve_patterns = [/anti-CD\d+/i]
+      end
+
+      # Since letter tokenizer splits on non-letters, "anti-CD3" is preserved as whole
+      tokens = TokenKit.tokenize("anti-CD3 treatment")
+      expect(tokens).to eq(["anti-CD3", "treatment"])
+    end
+
+    it "preserves measurements with units" do
+      TokenKit.configure do |config|
+        config.strategy = :letter
+        config.lowercase = true
+        config.preserve_patterns = [/\d+mg/, /\d+ug/]
+      end
+
+      tokens = TokenKit.tokenize("dose 100mg sample 50ug")
+      expect(tokens).to eq(["dose", "100mg", "sample", "50ug"])
+    end
+
+    it "works with remove_punctuation" do
+      TokenKit.configure do |config|
+        config.strategy = :letter
+        config.lowercase = true
+        config.remove_punctuation = true
+        config.preserve_patterns = [/USA/]
+      end
+
+      tokens = TokenKit.tokenize("USA! product!")
+      expect(tokens).to eq(["USA", "product"])
+    end
+  end
+
 end
