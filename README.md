@@ -36,7 +36,7 @@ TokenKit.tokenize("Patient received 100ug for BRCA1 study")
 
 ## Features
 
-- **Three tokenization strategies**: whitespace, unicode (recommended), and custom regex patterns
+- **Six tokenization strategies**: whitespace, unicode (recommended), custom regex patterns, sentence, grapheme, and keyword
 - **Pattern preservation**: Keep domain-specific terms (gene names, measurements, antibodies) intact even with case normalization
 - **Fast**: Rust-backed implementation (~100K docs/sec)
 - **Thread-safe**: Safe for concurrent use
@@ -88,6 +88,55 @@ TokenKit.tokenize("anti-CD3 antibody")
 # => ["anti-cd3", "antibody"]
 ```
 
+### Sentence
+
+Splits text into sentences using Unicode sentence boundaries:
+
+```ruby
+TokenKit.configure do |config|
+  config.strategy = :sentence
+  config.lowercase = false
+end
+
+TokenKit.tokenize("Hello world! How are you? I am fine.")
+# => ["Hello world! ", "How are you? ", "I am fine."]
+```
+
+Useful for document-level processing, sentence embeddings, or paragraph analysis.
+
+### Grapheme
+
+Splits text into grapheme clusters (user-perceived characters):
+
+```ruby
+TokenKit.configure do |config|
+  config.strategy = :grapheme
+  config.grapheme_extended = true  # Use extended grapheme clusters (default)
+  config.lowercase = false
+end
+
+TokenKit.tokenize("👨‍👩‍👧‍👦café")
+# => ["👨‍👩‍👧‍👦", "c", "a", "f", "é"]
+```
+
+Perfect for handling emoji, combining characters, and complex scripts. Set `grapheme_extended = false` for legacy grapheme boundaries.
+
+### Keyword
+
+Treats entire input as a single token (no splitting):
+
+```ruby
+TokenKit.configure do |config|
+  config.strategy = :keyword
+  config.lowercase = false
+end
+
+TokenKit.tokenize("PROD-2024-ABC-001")
+# => ["PROD-2024-ABC-001"]
+```
+
+Ideal for exact matching of SKUs, IDs, product codes, or category names where splitting would lose meaning.
+
 ## Pattern Preservation
 
 Preserve domain-specific terms even when lowercasing:
@@ -116,11 +165,12 @@ Pattern matches maintain their original case despite `lowercase=true`.
 
 ```ruby
 TokenKit.configure do |config|
-  config.strategy = :unicode           # :whitespace, :unicode, :pattern
-  config.lowercase = true              # Normalize to lowercase
-  config.remove_punctuation = false    # Remove punctuation from tokens
-  config.preserve_patterns = []        # Regex patterns to preserve
-  config.regex = /\w+/                 # Only for :pattern strategy
+  config.strategy = :unicode              # :whitespace, :unicode, :pattern, :sentence, :grapheme, :keyword
+  config.lowercase = true                 # Normalize to lowercase
+  config.remove_punctuation = false       # Remove punctuation from tokens
+  config.preserve_patterns = []           # Regex patterns to preserve
+  config.regex = /\w+/                    # Only for :pattern strategy
+  config.grapheme_extended = true         # Only for :grapheme strategy (default: true)
 end
 ```
 

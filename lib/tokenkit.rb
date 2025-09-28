@@ -37,6 +37,10 @@ module TokenKit
       config_hash["regex"] = Config.instance.regex
     end
 
+    if Config.instance.strategy == :grapheme
+      config_hash["extended"] = Config.instance.grapheme_extended
+    end
+
     _configure(config_hash)
   end
 
@@ -50,6 +54,7 @@ module TokenKit
     Config.instance.instance_variable_set(:@lowercase, true)
     Config.instance.instance_variable_set(:@remove_punctuation, false)
     Config.instance.instance_variable_set(:@preserve_patterns, [])
+    Config.instance.instance_variable_set(:@grapheme_extended, true)
   end
 
   def config_hash
@@ -84,6 +89,7 @@ module TokenKit
     normalized = {}
     normalized["strategy"] = opts[:strategy].to_s if opts[:strategy]
     normalized["regex"] = opts[:regex] if opts[:regex]
+    normalized["extended"] = opts[:extended] if opts.key?(:extended)
     normalized["lowercase"] = opts[:lowercase] if opts.key?(:lowercase)
     normalized["remove_punctuation"] = opts[:remove_punctuation] if opts.key?(:remove_punctuation)
 

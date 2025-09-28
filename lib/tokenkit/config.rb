@@ -1,6 +1,6 @@
 module TokenKit
   class Config
-    attr_accessor :strategy, :regex, :lowercase, :remove_punctuation, :preserve_patterns
+    attr_accessor :strategy, :regex, :grapheme_extended, :lowercase, :remove_punctuation, :preserve_patterns
 
     def self.instance
       @instance ||= new
@@ -11,6 +11,7 @@ module TokenKit
       @lowercase = true
       @remove_punctuation = false
       @preserve_patterns = []
+      @grapheme_extended = true
     end
 
     def apply!
@@ -25,6 +26,10 @@ module TokenKit
         config_hash["regex"] = regex
       end
 
+      if strategy == :grapheme
+        config_hash["extended"] = grapheme_extended
+      end
+
       TokenKit.configure(config_hash)
     end
 
@@ -32,6 +37,7 @@ module TokenKit
       {
         strategy: strategy,
         regex: regex,
+        grapheme_extended: grapheme_extended,
         lowercase: lowercase,
         remove_punctuation: remove_punctuation,
         preserve_patterns: preserve_patterns

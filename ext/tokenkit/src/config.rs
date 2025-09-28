@@ -13,6 +13,9 @@ pub enum TokenizerStrategy {
     Whitespace,
     Unicode,
     Pattern { regex: String },
+    Sentence,
+    Grapheme { extended: bool },
+    Keyword,
 }
 
 impl Default for TokenizerConfig {
