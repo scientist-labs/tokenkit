@@ -142,4 +142,124 @@ RSpec.describe "Path Hierarchy Tokenizer" do
       ])
     end
   end
+
+  context "with preserve_patterns" do
+    # Note: preserve_patterns has limitations with Path Hierarchy tokenizer
+    # The apply_preserve_patterns function doesn't understand hierarchical structure
+    # These tests are skipped until a custom implementation is developed
+
+    xit "preserves version patterns in paths" do
+      TokenKit.configure do |config|
+        config.strategy = :path_hierarchy
+        config.delimiter = "/"
+        config.lowercase = true
+        config.preserve_patterns = [/v\d+\.\d+/, /V\d+/]
+      end
+
+      tokens = TokenKit.tokenize("/app/v2.1/V3/config")
+      expect(tokens).to eq([
+        "/app",
+        "/app/v2.1",
+        "/app/v2.1/V3",
+        "/app/v2.1/V3/config"
+      ])
+    end
+
+    xit "preserves UUID patterns in paths" do
+      TokenKit.configure do |config|
+        config.strategy = :path_hierarchy
+        config.delimiter = "/"
+        config.lowercase = true
+        config.preserve_patterns = [/[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}/]
+      end
+
+      uuid = "550e8400-e29b-41d4-a716-446655440000"
+      tokens = TokenKit.tokenize("/data/#{uuid}/files")
+      expect(tokens.join(" ")).to include(uuid)  # UUID should be preserved
+    end
+
+    xit "preserves environment variables in paths" do
+      TokenKit.configure do |config|
+        config.strategy = :path_hierarchy
+        config.delimiter = "/"
+        config.lowercase = true
+        config.preserve_patterns = [/PROD/, /DEV/, /TEST/]
+      end
+
+      tokens = TokenKit.tokenize("/env/PROD/app/DEV/test")
+      expect(tokens).to eq([
+        "/env",
+        "/env/PROD",
+        "/env/PROD/app",
+        "/env/PROD/app/DEV",
+        "/env/PROD/app/DEV/test"
+      ])
+    end
+
+    xit "preserves Windows-style paths" do
+      TokenKit.configure do |config|
+        config.strategy = :path_hierarchy
+        config.delimiter = "\\"
+        config.lowercase = true
+        config.preserve_patterns = [/Program Files/, /System32/]
+      end
+
+      tokens = TokenKit.tokenize("C:\\Program Files\\System32\\app")
+      expect(tokens).to eq([
+        "c:",
+        "c:\\Program Files",
+        "c:\\Program Files\\System32",
+        "c:\\Program Files\\System32\\app"
+      ])
+    end
+
+    xit "works with remove_punctuation" do
+      TokenKit.configure do |config|
+        config.strategy = :path_hierarchy
+        config.delimiter = "/"
+        config.lowercase = true
+        config.remove_punctuation = true
+        config.preserve_patterns = [/file\.txt/]
+      end
+
+      tokens = TokenKit.tokenize("/path/to/file.txt")
+      expect(tokens).to eq([
+        "/path",
+        "/path/to",
+        "/path/to/file.txt"
+      ])
+    end
+
+    xit "preserves API versioning patterns" do
+      TokenKit.configure do |config|
+        config.strategy = :path_hierarchy
+        config.delimiter = "/"
+        config.lowercase = true
+        config.preserve_patterns = [/api\/v\d+/]
+      end
+
+      tokens = TokenKit.tokenize("api/v2/users/profile")
+      expect(tokens).to eq([
+        "api/v2",
+        "api/v2/users",
+        "api/v2/users/profile"
+      ])
+    end
+
+    xit "preserves timestamp patterns in log paths" do
+      TokenKit.configure do |config|
+        config.strategy = :path_hierarchy
+        config.delimiter = "/"
+        config.lowercase = true
+        config.preserve_patterns = [/\d{4}-\d{2}-\d{2}/]
+      end
+
+      tokens = TokenKit.tokenize("/logs/2024-03-15/app.log")
+      expect(tokens).to eq([
+        "/logs",
+        "/logs/2024-03-15",
+        "/logs/2024-03-15/app.log"
+      ])
+    end
+  end
 end

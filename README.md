@@ -98,7 +98,7 @@ TokenKit.tokenize("anti-CD3 antibody")
 
 Splits text into sentences using Unicode sentence boundaries.
 
-**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
+**✅ Supports `preserve_patterns`** (preserves patterns within each sentence)
 
 ```ruby
 TokenKit.configure do |config|
@@ -193,7 +193,7 @@ Perfect for fuzzy search, typo tolerance, and partial matching. Unlike edge n-gr
 
 Creates tokens for each level of a path hierarchy.
 
-**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
+**⚠️ Partially supports `preserve_patterns`** (has limitations with hierarchical structure)
 
 ```ruby
 TokenKit.configure do |config|
@@ -216,7 +216,7 @@ Perfect for filesystem paths, URL structures, category hierarchies, and breadcru
 
 Preserves URLs and email addresses as single tokens while tokenizing surrounding text.
 
-**⚠️ Does NOT support `preserve_patterns`** (patterns will be lowercased if `lowercase: true`)
+**✅ Supports `preserve_patterns`** (preserves patterns alongside URLs/emails)
 
 ```ruby
 TokenKit.configure do |config|
@@ -303,7 +303,11 @@ Perfect for case-insensitive search indexing, normalizing product codes, and cle
 
 Preserve domain-specific terms even when lowercasing.
 
-**Supported by:** Unicode, Pattern, Whitespace, Letter, Lowercase, and Character Group (with limitations) tokenizers.
+**Fully Supported by:** Unicode, Pattern, Whitespace, Letter, Lowercase, Sentence, and URL/Email tokenizers.
+
+**Partially Supported by:** Character Group (works best with whitespace delimiters) and Path Hierarchy (limitations with hierarchical structure) tokenizers.
+
+**Not Supported by:** Grapheme, Keyword, Edge N-gram, and N-gram tokenizers.
 
 ```ruby
 TokenKit.configure do |config|

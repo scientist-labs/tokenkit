@@ -1,14 +1,26 @@
-use super::{post_process_with_preserved, Tokenizer};
+use super::{apply_preserve_patterns, post_process_with_preserved, Tokenizer};
 use crate::config::TokenizerConfig;
+use regex::Regex;
 
 pub struct PathHierarchyTokenizer {
     config: TokenizerConfig,
     delimiter: String,
+    preserve_patterns: Vec<Regex>,
 }
 
 impl PathHierarchyTokenizer {
     pub fn new(config: TokenizerConfig, delimiter: String) -> Self {
-        Self { config, delimiter }
+        let preserve_patterns = config
+            .preserve_patterns
+            .iter()
+            .filter_map(|p| Regex::new(p).ok())
+            .collect();
+
+        Self {
+            config,
+            delimiter,
+            preserve_patterns,
+        }
     }
 
     fn generate_hierarchy(&self, path: &str) -> Vec<String> {
@@ -45,7 +57,13 @@ impl Tokenizer for PathHierarchyTokenizer {
         }
 
         let tokens = self.generate_hierarchy(trimmed);
-        post_process_with_preserved(tokens, &self.config, Some(&self.delimiter))
+
+        if !self.preserve_patterns.is_empty() {
+            // Apply preserve_patterns to maintain original case for matched patterns
+            apply_preserve_patterns(tokens, &self.preserve_patterns, trimmed, &self.config)
+        } else {
+            post_process_with_preserved(tokens, &self.config, Some(&self.delimiter))
+        }
     }
 
     fn config(&self) -> &TokenizerConfig {
