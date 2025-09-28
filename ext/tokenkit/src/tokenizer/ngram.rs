@@ -9,6 +9,10 @@ pub struct NgramTokenizer {
 
 impl NgramTokenizer {
     pub fn new(config: TokenizerConfig, min_gram: usize, max_gram: usize) -> Self {
+        // Validate and sanitize parameters
+        let min_gram = min_gram.max(1); // Minimum 1 character
+        let max_gram = max_gram.max(min_gram); // Ensure max >= min
+
         Self {
             config,
             min_gram,

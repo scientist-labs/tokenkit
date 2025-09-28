@@ -185,4 +185,33 @@ RSpec.describe "Character Group Tokenizer" do
       expect(tokens).to eq(["a", "b", "c"])
     end
   end
+
+  context "edge cases" do
+    it "handles empty split_on_chars by not splitting" do
+      tokens = TokenKit.tokenize(
+        "hello world",
+        strategy: :char_group,
+        split_on_chars: ""
+      )
+      expect(tokens).to eq(["hello world"])
+    end
+
+    it "handles split_on_chars with only one character" do
+      tokens = TokenKit.tokenize(
+        "a-b-c",
+        strategy: :char_group,
+        split_on_chars: "-"
+      )
+      expect(tokens).to eq(["a", "b", "c"])
+    end
+
+    it "handles split_on_chars with repeated characters" do
+      tokens = TokenKit.tokenize(
+        "a,b,c",
+        strategy: :char_group,
+        split_on_chars: ",,"  # Duplicates are handled by HashSet
+      )
+      expect(tokens).to eq(["a", "b", "c"])
+    end
+  end
 end

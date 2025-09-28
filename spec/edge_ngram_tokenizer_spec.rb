@@ -131,4 +131,35 @@ RSpec.describe "Edge N-gram Tokenizer" do
       expect(tokens).to include("la", "lap", "lapt", "lapto", "laptop")
     end
   end
+
+  context "input validation" do
+    it "handles min_gram = 0 by treating it as 1" do
+      tokens = TokenKit.tokenize("test", strategy: :edge_ngram, min_gram: 0, max_gram: 2)
+      # Should use min_gram = 1 instead
+      expect(tokens).to eq(["t", "te"])
+    end
+
+    it "handles min_gram > max_gram by adjusting max_gram" do
+      tokens = TokenKit.tokenize("test", strategy: :edge_ngram, min_gram: 3, max_gram: 1)
+      # Should adjust max_gram to match min_gram
+      expect(tokens).to eq(["tes"])
+    end
+
+    it "handles both invalid parameters" do
+      tokens = TokenKit.tokenize("test", strategy: :edge_ngram, min_gram: 0, max_gram: 0)
+      # Should use min_gram = 1, max_gram = 1
+      expect(tokens).to eq(["t"])
+    end
+
+    it "handles very large min_gram values" do
+      tokens = TokenKit.tokenize("test", strategy: :edge_ngram, min_gram: 10, max_gram: 15)
+      # min_gram > word length, should return empty
+      expect(tokens).to eq([])
+    end
+
+    it "works correctly with valid parameters" do
+      tokens = TokenKit.tokenize("test", strategy: :edge_ngram, min_gram: 2, max_gram: 3)
+      expect(tokens).to eq(["te", "tes"])
+    end
+  end
 end
