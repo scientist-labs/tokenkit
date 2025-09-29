@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 require_relative "tokenkit/version"
+require_relative "tokenkit/regex_converter"
+require_relative "tokenkit/config_builder"
+require_relative "tokenkit/config_compat"
 
 begin
   RUBY_VERSION =~ /(\d+\.\d+)/
@@ -14,6 +17,10 @@ module TokenKit
 
   extend self
 
+  # Thread-safe storage for current configuration
+  @current_config = nil
+  @config_mutex = Mutex.new
+
   def tokenize(text, **opts)
     if opts.any?
       with_temporary_config(opts) do
@@ -24,101 +31,66 @@ module TokenKit
     end
   end
 
-  def configure
-    # Save current config state in case we need to rollback
-    saved_state = {
-      strategy: Config.instance.strategy,
-      lowercase: Config.instance.lowercase,
-      remove_punctuation: Config.instance.remove_punctuation,
-      preserve_patterns: Config.instance.preserve_patterns.dup,
-      regex: Config.instance.regex,
-      grapheme_extended: Config.instance.grapheme_extended,
-      min_gram: Config.instance.min_gram,
-      max_gram: Config.instance.max_gram,
-      delimiter: Config.instance.delimiter,
-      split_on_chars: Config.instance.split_on_chars
-    }
-
-    begin
-      yield Config.instance if block_given?
-
-      # Validate strategy before proceeding
-      valid_strategies = [:unicode, :whitespace, :pattern, :sentence, :grapheme, :keyword,
-                         :edge_ngram, :ngram, :path_hierarchy, :url_email, :char_group,
-                         :letter, :lowercase]
-      unless valid_strategies.include?(Config.instance.strategy)
-        raise Error, "Invalid strategy: #{Config.instance.strategy}. Valid strategies are: #{valid_strategies.join(', ')}"
-      end
-
-      config_hash = {
-        "strategy" => Config.instance.strategy.to_s,
-        "lowercase" => Config.instance.lowercase,
-        "remove_punctuation" => Config.instance.remove_punctuation,
-        "preserve_patterns" => Config.instance.preserve_patterns.map { |p| p.is_a?(Regexp) ? regex_to_rust(p) : p.to_s }
-      }
-
-      # Warn if lowercase: false with :lowercase strategy
-      if Config.instance.strategy == :lowercase && !Config.instance.lowercase
-        warn "Warning: The :lowercase strategy always lowercases text. The 'lowercase: false' setting will be ignored."
-      end
-
-      if Config.instance.strategy == :pattern && Config.instance.regex
-        regex = Config.instance.regex
-        config_hash["regex"] = regex.is_a?(Regexp) ? regex_to_rust(regex) : regex.to_s
-      end
-
-      if Config.instance.strategy == :grapheme
-        config_hash["extended"] = Config.instance.grapheme_extended
-      end
-
-      if Config.instance.strategy == :edge_ngram || Config.instance.strategy == :ngram
-        # Validate min_gram and max_gram
-        min_gram = Config.instance.min_gram
-        max_gram = Config.instance.max_gram
-
-        if min_gram < 1
-          raise Error, "min_gram must be positive, got #{min_gram}"
-        end
-
-        if max_gram < min_gram
-          raise Error, "max_gram (#{max_gram}) must be >= min_gram (#{min_gram})"
-        end
-
-        config_hash["min_gram"] = min_gram
-        config_hash["max_gram"] = max_gram
-      end
-
-      if Config.instance.strategy == :path_hierarchy
-        config_hash["delimiter"] = Config.instance.delimiter
-      end
-
-      if Config.instance.strategy == :char_group
-        config_hash["split_on_chars"] = Config.instance.split_on_chars
-      end
-
-      _configure(config_hash)
-    rescue => e
-      # Rollback configuration on error
-      Config.instance.instance_variable_set(:@strategy, saved_state[:strategy])
-      Config.instance.instance_variable_set(:@lowercase, saved_state[:lowercase])
-      Config.instance.instance_variable_set(:@remove_punctuation, saved_state[:remove_punctuation])
-      Config.instance.instance_variable_set(:@preserve_patterns, saved_state[:preserve_patterns])
-      Config.instance.instance_variable_set(:@regex, saved_state[:regex]) if saved_state[:regex]
-      Config.instance.instance_variable_set(:@grapheme_extended, saved_state[:grapheme_extended])
-      Config.instance.instance_variable_set(:@min_gram, saved_state[:min_gram])
-      Config.instance.instance_variable_set(:@max_gram, saved_state[:max_gram])
-      Config.instance.instance_variable_set(:@delimiter, saved_state[:delimiter])
-      Config.instance.instance_variable_set(:@split_on_chars, saved_state[:split_on_chars])
-      raise e
-    end
-  end
-
+  # Get current configuration
+  # Returns the Config singleton for backward compatibility
   def config
     Config.instance
   end
 
+  # Get current configuration as immutable Configuration object
+  def config_hash
+    @config_mutex.synchronize do
+      @current_config ||= ConfigBuilder.new.build
+    end
+  end
+
+  def configure
+    # Use the compatibility wrapper to support old API
+    yield Config.instance if block_given?
+
+    # Get the builder from the compatibility wrapper
+    builder = Config.instance.build_config
+
+    begin
+      # Build and validate the new configuration
+      new_config = builder.build
+
+      # Apply to Rust tokenizer
+      _configure(new_config.to_rust_config)
+
+      # Store the new configuration
+      @config_mutex.synchronize do
+        @current_config = new_config
+      end
+
+      # Reset the compatibility wrapper
+      Config.instance.reset_temp
+
+      new_config
+    rescue => e
+      # Reset the compatibility wrapper on error
+      Config.instance.reset_temp
+      raise e
+    end
+  end
+
   def reset
+    # Create default configuration
+    new_config = ConfigBuilder.new.build
+
+    # Reset Rust tokenizer
     _reset
+    _configure(new_config.to_rust_config)
+
+    # Store the new configuration
+    @config_mutex.synchronize do
+      @current_config = new_config
+    end
+
+    # Reset the compatibility wrapper
+    Config.instance.reset_temp
+
+    # Reset Config singleton instance variables for backward compatibility
     Config.instance.instance_variable_set(:@strategy, :unicode)
     Config.instance.instance_variable_set(:@lowercase, true)
     Config.instance.instance_variable_set(:@remove_punctuation, false)
@@ -130,61 +102,49 @@ module TokenKit
     Config.instance.instance_variable_set(:@split_on_chars, " \t\n\r")
   end
 
-  def config_hash
-    Configuration.new(_config_hash)
-  end
-
   private
 
-  def regex_to_rust(pattern)
-    flags = ""
-    flags += "i" if (pattern.options & Regexp::IGNORECASE) != 0
-    flags += "m" if (pattern.options & Regexp::MULTILINE) != 0
-    flags += "x" if (pattern.options & Regexp::EXTENDED) != 0
-
-    if flags.empty?
-      pattern.source
-    else
-      "(?#{flags})#{pattern.source}"
-    end
-  end
-
   def with_temporary_config(opts)
+    # Save current Rust config
     previous_config = _config_hash
-    temp_config = previous_config.merge(normalize_options(opts))
 
-    # Warn if lowercase: false with :lowercase strategy
-    if temp_config["strategy"] == "lowercase" && temp_config["lowercase"] == false
-      warn "Warning: The :lowercase strategy always lowercases text. The 'lowercase: false' setting will be ignored."
-    end
+    # Build temporary config
+    builder = config_hash.to_builder
 
-    _configure(temp_config)
-    yield
-  ensure
-    _load_config(previous_config)
-  end
-
-  def normalize_options(opts)
-    normalized = {}
-
-    [:extended, :min_gram, :max_gram, :delimiter, :split_on_chars, :lowercase, :remove_punctuation].each do |key|
-      normalized[key.to_s] = opts[key] if opts.key?(key)
-    end
-
-    normalized["strategy"] = opts[:strategy].to_s if opts[:strategy]
-
-    if opts[:regex]
-      regex = opts[:regex]
-      normalized["regex"] = regex.is_a?(Regexp) ? regex_to_rust(regex) : regex.to_s
-    end
-
-    if opts[:preserve]
-      normalized["preserve_patterns"] = Array(opts[:preserve]).map do |pattern|
-        pattern.is_a?(Regexp) ? regex_to_rust(pattern) : pattern.to_s
+    # Apply options to builder
+    opts.each do |key, value|
+      case key
+      when :strategy
+        builder.strategy = value
+      when :lowercase
+        builder.lowercase = value
+      when :remove_punctuation
+        builder.remove_punctuation = value
+      when :preserve, :preserve_patterns
+        patterns = Array(value)
+        builder.preserve_patterns = patterns
+      when :regex
+        builder.regex = value
+      when :extended, :grapheme_extended
+        builder.grapheme_extended = value
+      when :min_gram
+        builder.min_gram = value
+      when :max_gram
+        builder.max_gram = value
+      when :delimiter
+        builder.delimiter = value
+      when :split_on_chars
+        builder.split_on_chars = value
       end
     end
 
-    normalized
+    temp_config = builder.build
+    _configure(temp_config.to_rust_config)
+
+    yield
+  ensure
+    # Restore previous config
+    _load_config(previous_config) if previous_config
   end
 
   def _tokenize(text)
@@ -207,6 +167,3 @@ module TokenKit
     raise NotImplementedError, "Native extension not loaded"
   end
 end
-
-require_relative "tokenkit/config"
-require_relative "tokenkit/configuration"
