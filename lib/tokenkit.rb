@@ -33,6 +33,11 @@ module TokenKit
       "preserve_patterns" => Config.instance.preserve_patterns.map { |p| p.is_a?(Regexp) ? regex_to_rust(p) : p.to_s }
     }
 
+    # Warn if lowercase: false with :lowercase strategy
+    if Config.instance.strategy == :lowercase && !Config.instance.lowercase
+      warn "Warning: The :lowercase strategy always lowercases text. The 'lowercase: false' setting will be ignored."
+    end
+
     if Config.instance.strategy == :pattern && Config.instance.regex
       regex = Config.instance.regex
       config_hash["regex"] = regex.is_a?(Regexp) ? regex_to_rust(regex) : regex.to_s
@@ -42,13 +47,17 @@ module TokenKit
       config_hash["extended"] = Config.instance.grapheme_extended
     end
 
-    if Config.instance.strategy == :edge_ngram
+    if Config.instance.strategy == :edge_ngram || Config.instance.strategy == :ngram
       config_hash["min_gram"] = Config.instance.min_gram
       config_hash["max_gram"] = Config.instance.max_gram
     end
 
     if Config.instance.strategy == :path_hierarchy
       config_hash["delimiter"] = Config.instance.delimiter
+    end
+
+    if Config.instance.strategy == :char_group
+      config_hash["split_on_chars"] = Config.instance.split_on_chars
     end
 
     _configure(config_hash)
@@ -68,6 +77,7 @@ module TokenKit
     Config.instance.instance_variable_set(:@min_gram, 2)
     Config.instance.instance_variable_set(:@max_gram, 10)
     Config.instance.instance_variable_set(:@delimiter, "/")
+    Config.instance.instance_variable_set(:@split_on_chars, " \t\n\r")
   end
 
   def config_hash
@@ -92,6 +102,12 @@ module TokenKit
   def with_temporary_config(opts)
     previous_config = _config_hash
     temp_config = previous_config.merge(normalize_options(opts))
+
+    # Warn if lowercase: false with :lowercase strategy
+    if temp_config["strategy"] == "lowercase" && temp_config["lowercase"] == false
+      warn "Warning: The :lowercase strategy always lowercases text. The 'lowercase: false' setting will be ignored."
+    end
+
     _configure(temp_config)
     yield
   ensure
@@ -101,7 +117,7 @@ module TokenKit
   def normalize_options(opts)
     normalized = {}
 
-    [:extended, :min_gram, :max_gram, :delimiter, :lowercase, :remove_punctuation].each do |key|
+    [:extended, :min_gram, :max_gram, :delimiter, :split_on_chars, :lowercase, :remove_punctuation].each do |key|
       normalized[key.to_s] = opts[key] if opts.key?(key)
     end
 

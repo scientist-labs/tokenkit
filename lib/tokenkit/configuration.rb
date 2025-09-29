@@ -46,6 +46,26 @@ module TokenKit
       @raw_hash["delimiter"]
     end
 
+    def ngram?
+      strategy == :ngram
+    end
+
+    def char_group?
+      strategy == :char_group
+    end
+
+    def split_on_chars
+      @raw_hash["split_on_chars"]
+    end
+
+    def letter?
+      strategy == :letter
+    end
+
+    def lowercase?
+      strategy == :lowercase
+    end
+
     def to_h
       @raw_hash.dup
     end

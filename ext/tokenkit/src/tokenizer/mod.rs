@@ -5,8 +5,12 @@ mod sentence;
 mod grapheme;
 mod keyword;
 mod edge_ngram;
+mod ngram;
 mod path_hierarchy;
 mod url_email;
+mod char_group;
+mod letter;
+mod lowercase;
 
 pub use whitespace::WhitespaceTokenizer;
 pub use unicode::UnicodeTokenizer;
@@ -15,8 +19,12 @@ pub use sentence::SentenceTokenizer;
 pub use grapheme::GraphemeTokenizer;
 pub use keyword::KeywordTokenizer;
 pub use edge_ngram::EdgeNgramTokenizer;
+pub use ngram::NgramTokenizer;
 pub use path_hierarchy::PathHierarchyTokenizer;
 pub use url_email::UrlEmailTokenizer;
+pub use char_group::CharGroupTokenizer;
+pub use letter::LetterTokenizer;
+pub use lowercase::LowercaseTokenizer;
 
 use crate::config::{TokenizerConfig, TokenizerStrategy};
 use regex::Regex;
@@ -48,6 +56,14 @@ pub fn from_config(config: TokenizerConfig) -> Result<Box<dyn Tokenizer>, String
         TokenizerStrategy::UrlEmail => {
             Ok(Box::new(UrlEmailTokenizer::new(config)))
         }
+        TokenizerStrategy::Ngram { min_gram, max_gram } => {
+            Ok(Box::new(NgramTokenizer::new(config, min_gram, max_gram)))
+        }
+        TokenizerStrategy::CharGroup { split_on_chars } => {
+            Ok(Box::new(CharGroupTokenizer::new(config, split_on_chars)))
+        }
+        TokenizerStrategy::Letter => Ok(Box::new(LetterTokenizer::new(config))),
+        TokenizerStrategy::Lowercase => Ok(Box::new(LowercaseTokenizer::new(config))),
     }
 }
 

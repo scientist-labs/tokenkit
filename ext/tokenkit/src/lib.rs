@@ -80,6 +80,32 @@ fn configure(config_hash: RHash) -> Result<(), Error> {
                 TokenizerStrategy::PathHierarchy { delimiter }
             }
             "url_email" => TokenizerStrategy::UrlEmail,
+            "ngram" => {
+                let min_gram_val = config_hash.get("min_gram");
+                let min_gram = if let Some(val) = min_gram_val {
+                    TryConvert::try_convert(val)?
+                } else {
+                    2
+                };
+                let max_gram_val = config_hash.get("max_gram");
+                let max_gram = if let Some(val) = max_gram_val {
+                    TryConvert::try_convert(val)?
+                } else {
+                    10
+                };
+                TokenizerStrategy::Ngram { min_gram, max_gram }
+            }
+            "char_group" => {
+                let split_on_chars_val = config_hash.get("split_on_chars");
+                let split_on_chars = if let Some(val) = split_on_chars_val {
+                    TryConvert::try_convert(val)?
+                } else {
+                    " \t\n\r".to_string()
+                };
+                TokenizerStrategy::CharGroup { split_on_chars }
+            }
+            "letter" => TokenizerStrategy::Letter,
+            "lowercase" => TokenizerStrategy::Lowercase,
             _ => TokenizerStrategy::Unicode,
         }
     } else {
@@ -147,8 +173,12 @@ fn config_hash() -> Result<RHash, Error> {
                 TokenizerStrategy::Grapheme { .. } => "grapheme",
                 TokenizerStrategy::Keyword => "keyword",
                 TokenizerStrategy::EdgeNgram { .. } => "edge_ngram",
+                TokenizerStrategy::Ngram { .. } => "ngram",
                 TokenizerStrategy::PathHierarchy { .. } => "path_hierarchy",
                 TokenizerStrategy::UrlEmail => "url_email",
+                TokenizerStrategy::CharGroup { .. } => "char_group",
+                TokenizerStrategy::Letter => "letter",
+                TokenizerStrategy::Lowercase => "lowercase",
             };
             hash.aset("strategy", strategy_str)?;
 
@@ -167,6 +197,15 @@ fn config_hash() -> Result<RHash, Error> {
 
             if let TokenizerStrategy::PathHierarchy { delimiter } = &config.strategy {
                 hash.aset("delimiter", delimiter.as_str())?;
+            }
+
+            if let TokenizerStrategy::Ngram { min_gram, max_gram } = &config.strategy {
+                hash.aset("min_gram", *min_gram)?;
+                hash.aset("max_gram", *max_gram)?;
+            }
+
+            if let TokenizerStrategy::CharGroup { split_on_chars } = &config.strategy {
+                hash.aset("split_on_chars", split_on_chars.as_str())?;
             }
 
             hash.aset("lowercase", config.lowercase)?;
