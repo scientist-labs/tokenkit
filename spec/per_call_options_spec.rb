@@ -333,4 +333,54 @@ RSpec.describe "Per-Call Options" do
       expect(tokens).to eq(["te", "tes"])
     end
   end
+
+  describe "fresh instance with per-call options" do
+    it "creates fresh tokenizer with merged config" do
+      TokenKit.configure do |c|
+        c.strategy = :unicode
+        c.lowercase = true
+        c.remove_punctuation = false
+      end
+
+      # Each call with options should create a fresh tokenizer
+      results = []
+      threads = []
+
+      5.times do |i|
+        threads << Thread.new do
+          # Different options per call
+          result = TokenKit.tokenize("Hello-World!",
+            lowercase: i.even?,
+            remove_punctuation: i > 2
+          )
+          results << result
+        end
+      end
+
+      threads.each(&:join)
+
+      # Should have different results based on options
+      expect(results.size).to eq(5)
+      expect(results.uniq.size).to be > 1
+    end
+
+    it "doesn't affect the global configuration" do
+      TokenKit.configure do |c|
+        c.strategy = :unicode
+        c.lowercase = true
+      end
+
+      # Tokenize with temporary options
+      result1 = TokenKit.tokenize("Hello World", lowercase: false)
+
+      # Global config should be unchanged
+      expect(TokenKit.config.lowercase).to eq(true)
+
+      # Next call without options should use global config
+      result2 = TokenKit.tokenize("Hello World")
+
+      expect(result1).to eq(["Hello", "World"])
+      expect(result2).to eq(["hello", "world"])
+    end
+  end
 end

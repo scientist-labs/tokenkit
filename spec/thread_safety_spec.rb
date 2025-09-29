@@ -67,11 +67,12 @@ RSpec.describe "Thread Safety" do
       expect(results.size).to eq(10)
     end
 
-    it "maintains configuration isolation per thread (current global behavior)" do
-      # This test documents CURRENT behavior - global config
-      # After Phase 3, this should change to per-instance isolation
+    it "maintains configuration as global defaults (Phase 3 complete)" do
+      # After Phase 3: configure sets global defaults,
+      # but each tokenize call creates its own instance
 
       config_values = []
+      tokenize_results = []
       mutex = Mutex.new
 
       threads = []
@@ -83,22 +84,25 @@ RSpec.describe "Thread Safety" do
             config.strategy = strategy
           end
 
-          # Small delay to increase chance of race condition
+          # Small delay to simulate race condition
           sleep(0.01)
 
           mutex.synchronize do
             config_values << TokenKit.config.strategy
+            # Each tokenize creates a fresh instance
+            tokenize_results << TokenKit.tokenize("hello-world")
           end
         end
       end
 
       threads.each(&:join)
 
-      # Currently both threads affect global state
-      # After refactor, each should maintain its own
+      # Global config is shared (last writer wins)
       expect(config_values.size).to eq(2)
-      # Current behavior: last writer wins
-      # This documents that we have a race condition!
+      # But tokenization still works correctly
+      expect(tokenize_results.size).to eq(2)
+      # Results depend on which config was active when tokenize was called
+      expect(tokenize_results.flatten.uniq).to include("hello")
     end
   end
 
@@ -169,6 +173,108 @@ RSpec.describe "Thread Safety" do
 
       threads.each(&:join)
       expect(errors).to be_empty
+    end
+  end
+
+  describe "fresh instance behavior" do
+    it "creates a fresh tokenizer for each call" do
+      # Each tokenize call should be independent
+      results = []
+      threads = []
+
+      TokenKit.configure do |c|
+        c.strategy = :unicode
+        c.lowercase = true
+      end
+
+      10.times do |i|
+        threads << Thread.new do
+          # Each should get its own tokenizer instance internally
+          result = TokenKit.tokenize("Hello World")
+          results << result
+        end
+      end
+
+      threads.each(&:join)
+
+      # All results should be the same (using same config)
+      expect(results.size).to eq(10)
+      expect(results.uniq.size).to eq(1)
+      expect(results.first).to eq(["hello", "world"])
+    end
+
+    it "doesn't block other tokenize calls" do
+      # Verify that multiple tokenize calls can run concurrently
+      start_times = []
+      end_times = []
+      mutex = Mutex.new
+
+      threads = 5.times.map do |i|
+        Thread.new do
+          mutex.synchronize { start_times << Time.now }
+          TokenKit.tokenize("This is test text number #{i}")
+          mutex.synchronize { end_times << Time.now }
+        end
+      end
+
+      threads.each(&:join)
+
+      # Check that threads overlapped
+      earliest_end = end_times.min
+      latest_start = start_times.max
+
+      # Some threads should have started before others ended
+      expect(latest_start).to be < (earliest_end + 0.01)
+    end
+
+    it "handles configuration changes safely during tokenization" do
+      results = []
+      mutex = Mutex.new
+      threads = []
+
+      # Some threads change config
+      5.times do |i|
+        threads << Thread.new do
+          TokenKit.configure do |c|
+            c.strategy = i.even? ? :whitespace : :unicode
+          end
+          sleep(0.001)
+        end
+      end
+
+      # Other threads tokenize
+      10.times do
+        threads << Thread.new do
+          sleep(0.001)
+          result = TokenKit.tokenize("hello-world")
+          mutex.synchronize { results << result }
+        end
+      end
+
+      threads.each(&:join)
+
+      expect(results.size).to eq(10)
+      expect(results.flatten).not_to be_empty
+    end
+  end
+
+  describe "performance" do
+    it "handles high concurrency efficiently" do
+      require 'benchmark'
+
+      time = Benchmark.realtime do
+        threads = 100.times.map do |i|
+          Thread.new do
+            10.times do
+              TokenKit.tokenize("Test text #{i}")
+            end
+          end
+        end
+        threads.each(&:join)
+      end
+
+      # Should complete 1000 tokenizations quickly
+      expect(time).to be < 1.0
     end
   end
 
