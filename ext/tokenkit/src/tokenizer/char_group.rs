@@ -1,4 +1,4 @@
-use super::{apply_preserve_patterns, post_process, BaseTokenizerFields, Tokenizer};
+use super::{apply_preserve_patterns_with_tokenizer, post_process, BaseTokenizerFields, Tokenizer};
 use crate::config::TokenizerConfig;
 use std::collections::HashSet;
 
@@ -18,10 +18,8 @@ impl CharGroupTokenizer {
             split_chars,
         }
     }
-}
 
-impl Tokenizer for CharGroupTokenizer {
-    fn tokenize(&self, text: &str) -> Vec<String> {
+    fn tokenize_text(&self, text: &str) -> Vec<String> {
         let mut tokens = Vec::new();
         let mut current_token = String::new();
 
@@ -40,8 +38,22 @@ impl Tokenizer for CharGroupTokenizer {
             tokens.push(current_token);
         }
 
+        tokens
+    }
+}
+
+impl Tokenizer for CharGroupTokenizer {
+    fn tokenize(&self, text: &str) -> Vec<String> {
+        let tokens = self.tokenize_text(text);
+
         if self.base.has_preserve_patterns() {
-            apply_preserve_patterns(tokens, self.base.preserve_patterns(), text, &self.base.config)
+            apply_preserve_patterns_with_tokenizer(
+                tokens,
+                self.base.preserve_patterns(),
+                text,
+                &self.base.config,
+                |t| self.tokenize_text(t),
+            )
         } else {
             post_process(tokens, &self.base.config)
         }

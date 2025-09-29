@@ -103,6 +103,25 @@ pub(crate) fn apply_preserve_patterns(
     original_text: &str,
     config: &TokenizerConfig,
 ) -> Vec<String> {
+    apply_preserve_patterns_with_tokenizer(
+        tokens,
+        preserve_patterns,
+        original_text,
+        config,
+        tokenize_simple,
+    )
+}
+
+pub(crate) fn apply_preserve_patterns_with_tokenizer<F>(
+    tokens: Vec<String>,
+    preserve_patterns: &[Regex],
+    original_text: &str,
+    config: &TokenizerConfig,
+    tokenizer_fn: F,
+) -> Vec<String>
+where
+    F: Fn(&str) -> Vec<String>,
+{
     if preserve_patterns.is_empty() {
         return tokens;
     }
@@ -126,7 +145,7 @@ pub(crate) fn apply_preserve_patterns(
     for (start, end, preserved) in preserved_spans {
         if start > pos {
             let before = &original_text[pos..start];
-            let before_tokens = tokenize_simple(before);
+            let before_tokens = tokenizer_fn(before);
             let before_tokens = post_process(before_tokens, config);
             result.extend(before_tokens);
         }
@@ -136,7 +155,7 @@ pub(crate) fn apply_preserve_patterns(
 
     if pos < original_text.len() {
         let remaining = &original_text[pos..];
-        let remaining_tokens = tokenize_simple(remaining);
+        let remaining_tokens = tokenizer_fn(remaining);
         let remaining_tokens = post_process(remaining_tokens, config);
         result.extend(remaining_tokens);
     }

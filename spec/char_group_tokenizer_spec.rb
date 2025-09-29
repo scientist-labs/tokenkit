@@ -238,7 +238,7 @@ RSpec.describe "Character Group Tokenizer" do
     # The following tests are skipped until the architectural issue is resolved
     # where apply_preserve_patterns uses whitespace tokenization for non-preserved text
 
-    xit "preserves patterns in CSV-like data" do
+    it "preserves patterns in CSV-like data" do
       TokenKit.configure do |config|
         config.strategy = :char_group
         config.split_on_chars = ","
@@ -250,7 +250,7 @@ RSpec.describe "Character Group Tokenizer" do
       expect(tokens).to eq(["product", "USD50", "price", "EUR45"])
     end
 
-    xit "preserves email addresses in semicolon-separated data" do
+    it "preserves email addresses in semicolon-separated data" do
       TokenKit.configure do |config|
         config.strategy = :char_group
         config.split_on_chars = ";"
@@ -262,7 +262,7 @@ RSpec.describe "Character Group Tokenizer" do
       expect(tokens).to eq(["name", "John.Doe@example.com", "active"])
     end
 
-    xit "preserves gene names in pipe-separated data" do
+    it "preserves gene names in pipe-separated data" do
       TokenKit.configure do |config|
         config.strategy = :char_group
         config.split_on_chars = "|"
