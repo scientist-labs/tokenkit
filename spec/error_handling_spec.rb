@@ -50,14 +50,13 @@ RSpec.describe "Error Handling" do
       }.to raise_error(TokenKit::Error, /max_gram .* must be >= min_gram/)
     end
 
-    it "handles empty delimiter for path_hierarchy" do
-      TokenKit.configure do |config|
-        config.strategy = :path_hierarchy
-        config.delimiter = ""
-      end
-
-      tokens = TokenKit.tokenize("/usr/local/bin")
-      expect(tokens).to be_a(Array)
+    it "raises error for empty delimiter with path_hierarchy" do
+      expect {
+        TokenKit.configure do |config|
+          config.strategy = :path_hierarchy
+          config.delimiter = ""
+        end
+      }.to raise_error(TokenKit::Error, /Path hierarchy requires a delimiter/)
     end
   end
 

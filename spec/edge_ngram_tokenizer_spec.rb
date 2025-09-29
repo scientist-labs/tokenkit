@@ -133,22 +133,22 @@ RSpec.describe "Edge N-gram Tokenizer" do
   end
 
   context "input validation" do
-    it "handles min_gram = 0 by treating it as 1" do
-      tokens = TokenKit.tokenize("test", strategy: :edge_ngram, min_gram: 0, max_gram: 2)
-      # Should use min_gram = 1 instead
-      expect(tokens).to eq(["t", "te"])
+    it "raises error for min_gram = 0" do
+      expect {
+        TokenKit.tokenize("test", strategy: :edge_ngram, min_gram: 0, max_gram: 2)
+      }.to raise_error(TokenKit::Error, /min_gram must be positive/)
     end
 
-    it "handles min_gram > max_gram by adjusting max_gram" do
-      tokens = TokenKit.tokenize("test", strategy: :edge_ngram, min_gram: 3, max_gram: 1)
-      # Should adjust max_gram to match min_gram
-      expect(tokens).to eq(["tes"])
+    it "raises error when min_gram > max_gram" do
+      expect {
+        TokenKit.tokenize("test", strategy: :edge_ngram, min_gram: 3, max_gram: 1)
+      }.to raise_error(TokenKit::Error, /max_gram .* must be >= min_gram/)
     end
 
-    it "handles both invalid parameters" do
-      tokens = TokenKit.tokenize("test", strategy: :edge_ngram, min_gram: 0, max_gram: 0)
-      # Should use min_gram = 1, max_gram = 1
-      expect(tokens).to eq(["t"])
+    it "raises error for invalid parameters" do
+      expect {
+        TokenKit.tokenize("test", strategy: :edge_ngram, min_gram: 0, max_gram: 0)
+      }.to raise_error(TokenKit::Error, /min_gram must be positive/)
     end
 
     it "handles very large min_gram values" do

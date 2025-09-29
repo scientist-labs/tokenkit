@@ -123,11 +123,12 @@ module TokenKit
       @strategy = config_hash["strategy"]&.to_sym || :unicode
       @lowercase = config_hash.fetch("lowercase", true)
       @remove_punctuation = config_hash.fetch("remove_punctuation", false)
-      @preserve_patterns = config_hash.fetch("preserve_patterns", []).freeze
       @raw_hash = config_hash.freeze
 
       # Store builder data for creating new builders from this config
       if builder
+        # Store original Ruby patterns, not the converted strings
+        @preserve_patterns = builder.preserve_patterns.freeze
         @regex = builder.regex
         @grapheme_extended = builder.grapheme_extended
         @min_gram = builder.min_gram
@@ -136,12 +137,13 @@ module TokenKit
         @split_on_chars = builder.split_on_chars
       else
         # Extract from raw_hash for backward compatibility
+        @preserve_patterns = config_hash.fetch("preserve_patterns", []).freeze
         @regex = config_hash["regex"]
-        @grapheme_extended = config_hash["extended"] || ConfigBuilder::DEFAULTS[:grapheme_extended]
-        @min_gram = config_hash["min_gram"] || ConfigBuilder::DEFAULTS[:min_gram]
-        @max_gram = config_hash["max_gram"] || ConfigBuilder::DEFAULTS[:max_gram]
-        @delimiter = config_hash["delimiter"] || ConfigBuilder::DEFAULTS[:delimiter]
-        @split_on_chars = config_hash["split_on_chars"] || ConfigBuilder::DEFAULTS[:split_on_chars]
+        @grapheme_extended = config_hash.fetch("extended", ConfigBuilder::DEFAULTS[:grapheme_extended])
+        @min_gram = config_hash.fetch("min_gram", ConfigBuilder::DEFAULTS[:min_gram])
+        @max_gram = config_hash.fetch("max_gram", ConfigBuilder::DEFAULTS[:max_gram])
+        @delimiter = config_hash.fetch("delimiter", ConfigBuilder::DEFAULTS[:delimiter])
+        @split_on_chars = config_hash.fetch("split_on_chars", ConfigBuilder::DEFAULTS[:split_on_chars])
       end
     end
 
