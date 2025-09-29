@@ -6,7 +6,7 @@ module TokenKit
       @strategy = config_hash["strategy"]&.to_sym || :unicode
       @lowercase = config_hash.fetch("lowercase", true)
       @remove_punctuation = config_hash.fetch("remove_punctuation", false)
-      @preserve_patterns = config_hash.fetch("preserve_patterns", [])
+      @preserve_patterns = config_hash.fetch("preserve_patterns", []).freeze
       @raw_hash = config_hash
     end
 

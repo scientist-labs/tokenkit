@@ -25,42 +25,92 @@ module TokenKit
   end
 
   def configure
-    yield Config.instance if block_given?
-    config_hash = {
-      "strategy" => Config.instance.strategy.to_s,
-      "lowercase" => Config.instance.lowercase,
-      "remove_punctuation" => Config.instance.remove_punctuation,
-      "preserve_patterns" => Config.instance.preserve_patterns.map { |p| p.is_a?(Regexp) ? regex_to_rust(p) : p.to_s }
+    # Save current config state in case we need to rollback
+    saved_state = {
+      strategy: Config.instance.strategy,
+      lowercase: Config.instance.lowercase,
+      remove_punctuation: Config.instance.remove_punctuation,
+      preserve_patterns: Config.instance.preserve_patterns.dup,
+      regex: Config.instance.regex,
+      grapheme_extended: Config.instance.grapheme_extended,
+      min_gram: Config.instance.min_gram,
+      max_gram: Config.instance.max_gram,
+      delimiter: Config.instance.delimiter,
+      split_on_chars: Config.instance.split_on_chars
     }
 
-    # Warn if lowercase: false with :lowercase strategy
-    if Config.instance.strategy == :lowercase && !Config.instance.lowercase
-      warn "Warning: The :lowercase strategy always lowercases text. The 'lowercase: false' setting will be ignored."
-    end
+    begin
+      yield Config.instance if block_given?
 
-    if Config.instance.strategy == :pattern && Config.instance.regex
-      regex = Config.instance.regex
-      config_hash["regex"] = regex.is_a?(Regexp) ? regex_to_rust(regex) : regex.to_s
-    end
+      # Validate strategy before proceeding
+      valid_strategies = [:unicode, :whitespace, :pattern, :sentence, :grapheme, :keyword,
+                         :edge_ngram, :ngram, :path_hierarchy, :url_email, :char_group,
+                         :letter, :lowercase]
+      unless valid_strategies.include?(Config.instance.strategy)
+        raise Error, "Invalid strategy: #{Config.instance.strategy}. Valid strategies are: #{valid_strategies.join(', ')}"
+      end
 
-    if Config.instance.strategy == :grapheme
-      config_hash["extended"] = Config.instance.grapheme_extended
-    end
+      config_hash = {
+        "strategy" => Config.instance.strategy.to_s,
+        "lowercase" => Config.instance.lowercase,
+        "remove_punctuation" => Config.instance.remove_punctuation,
+        "preserve_patterns" => Config.instance.preserve_patterns.map { |p| p.is_a?(Regexp) ? regex_to_rust(p) : p.to_s }
+      }
 
-    if Config.instance.strategy == :edge_ngram || Config.instance.strategy == :ngram
-      config_hash["min_gram"] = Config.instance.min_gram
-      config_hash["max_gram"] = Config.instance.max_gram
-    end
+      # Warn if lowercase: false with :lowercase strategy
+      if Config.instance.strategy == :lowercase && !Config.instance.lowercase
+        warn "Warning: The :lowercase strategy always lowercases text. The 'lowercase: false' setting will be ignored."
+      end
 
-    if Config.instance.strategy == :path_hierarchy
-      config_hash["delimiter"] = Config.instance.delimiter
-    end
+      if Config.instance.strategy == :pattern && Config.instance.regex
+        regex = Config.instance.regex
+        config_hash["regex"] = regex.is_a?(Regexp) ? regex_to_rust(regex) : regex.to_s
+      end
 
-    if Config.instance.strategy == :char_group
-      config_hash["split_on_chars"] = Config.instance.split_on_chars
-    end
+      if Config.instance.strategy == :grapheme
+        config_hash["extended"] = Config.instance.grapheme_extended
+      end
 
-    _configure(config_hash)
+      if Config.instance.strategy == :edge_ngram || Config.instance.strategy == :ngram
+        # Validate min_gram and max_gram
+        min_gram = Config.instance.min_gram
+        max_gram = Config.instance.max_gram
+
+        if min_gram < 1
+          raise Error, "min_gram must be positive, got #{min_gram}"
+        end
+
+        if max_gram < min_gram
+          raise Error, "max_gram (#{max_gram}) must be >= min_gram (#{min_gram})"
+        end
+
+        config_hash["min_gram"] = min_gram
+        config_hash["max_gram"] = max_gram
+      end
+
+      if Config.instance.strategy == :path_hierarchy
+        config_hash["delimiter"] = Config.instance.delimiter
+      end
+
+      if Config.instance.strategy == :char_group
+        config_hash["split_on_chars"] = Config.instance.split_on_chars
+      end
+
+      _configure(config_hash)
+    rescue => e
+      # Rollback configuration on error
+      Config.instance.instance_variable_set(:@strategy, saved_state[:strategy])
+      Config.instance.instance_variable_set(:@lowercase, saved_state[:lowercase])
+      Config.instance.instance_variable_set(:@remove_punctuation, saved_state[:remove_punctuation])
+      Config.instance.instance_variable_set(:@preserve_patterns, saved_state[:preserve_patterns])
+      Config.instance.instance_variable_set(:@regex, saved_state[:regex]) if saved_state[:regex]
+      Config.instance.instance_variable_set(:@grapheme_extended, saved_state[:grapheme_extended])
+      Config.instance.instance_variable_set(:@min_gram, saved_state[:min_gram])
+      Config.instance.instance_variable_set(:@max_gram, saved_state[:max_gram])
+      Config.instance.instance_variable_set(:@delimiter, saved_state[:delimiter])
+      Config.instance.instance_variable_set(:@split_on_chars, saved_state[:split_on_chars])
+      raise e
+    end
   end
 
   def config
