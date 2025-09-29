@@ -6,3 +6,7 @@ source "https://rubygems.org"
 gemspec
 
 gem "irb"
+
+# Benchmarking
+gem "benchmark-ips"
+gem "benchmark-memory"

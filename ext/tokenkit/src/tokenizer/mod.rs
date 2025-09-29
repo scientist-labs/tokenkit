@@ -98,6 +98,34 @@ pub(crate) fn merge_overlapping_spans(mut spans: Vec<(usize, usize, String)>) ->
     merged
 }
 
+// Optimized version that works with indices only
+fn merge_overlapping_spans_optimized(mut spans: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
+    if spans.is_empty() {
+        return spans;
+    }
+
+    spans.sort_unstable_by(|a, b| {
+        a.0.cmp(&b.0)
+            .then_with(|| b.1.cmp(&a.1))
+    });
+
+    let mut merged = Vec::with_capacity(spans.len());
+    let mut current = spans[0];
+
+    for span in spans.into_iter().skip(1) {
+        if span.0 < current.1 {
+            if span.1 > current.1 {
+                current.1 = span.1;
+            }
+        } else {
+            merged.push(current);
+            current = span;
+        }
+    }
+    merged.push(current);
+    merged
+}
+
 pub(crate) fn apply_preserve_patterns(
     tokens: Vec<String>,
     preserve_patterns: &[Regex],
@@ -127,10 +155,11 @@ where
         return tokens;
     }
 
-    let mut preserved_spans: Vec<(usize, usize, String)> = Vec::new();
+    // Use indices instead of allocating strings upfront
+    let mut preserved_spans: Vec<(usize, usize)> = Vec::with_capacity(32);
     for pattern in preserve_patterns {
         for mat in pattern.find_iter(original_text) {
-            preserved_spans.push((mat.start(), mat.end(), mat.as_str().to_string()));
+            preserved_spans.push((mat.start(), mat.end()));
         }
     }
 
@@ -138,26 +167,28 @@ where
         return tokens;
     }
 
-    let preserved_spans = merge_overlapping_spans(preserved_spans);
+    let preserved_spans = merge_overlapping_spans_optimized(preserved_spans);
 
-    let mut result = Vec::new();
+    // Pre-allocate result vector with estimated capacity
+    let mut result = Vec::with_capacity(tokens.len() + preserved_spans.len());
     let mut pos = 0;
 
-    for (start, end, preserved) in preserved_spans {
+    for (start, end) in preserved_spans {
         if start > pos {
             let before = &original_text[pos..start];
-            let before_tokens = tokenizer_fn(before);
-            let before_tokens = post_process(before_tokens, config);
+            let mut before_tokens = tokenizer_fn(before);
+            post_process_in_place(&mut before_tokens, config);
             result.extend(before_tokens);
         }
-        result.push(preserved);
+        // Extract preserved text only when needed
+        result.push(original_text[start..end].to_string());
         pos = end;
     }
 
     if pos < original_text.len() {
         let remaining = &original_text[pos..];
-        let remaining_tokens = tokenizer_fn(remaining);
-        let remaining_tokens = post_process(remaining_tokens, config);
+        let mut remaining_tokens = tokenizer_fn(remaining);
+        post_process_in_place(&mut remaining_tokens, config);
         result.extend(remaining_tokens);
     }
 
@@ -173,6 +204,22 @@ fn tokenize_simple(text: &str) -> Vec<String> {
 
 pub(crate) fn post_process(tokens: Vec<String>, config: &TokenizerConfig) -> Vec<String> {
     post_process_with_preserved(tokens, config, None)
+}
+
+// In-place version to avoid allocation
+fn post_process_in_place(tokens: &mut Vec<String>, config: &TokenizerConfig) {
+    if config.lowercase {
+        for token in tokens.iter_mut() {
+            *token = token.to_lowercase();
+        }
+    }
+
+    if config.remove_punctuation {
+        tokens.retain_mut(|token| {
+            token.retain(|c| !c.is_ascii_punctuation());
+            !token.is_empty()
+        });
+    }
 }
 
 pub(crate) fn post_process_with_preserved(

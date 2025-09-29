@@ -6,60 +6,74 @@ use config::{TokenizerConfig, TokenizerStrategy};
 use error::TokenizerError;
 use magnus::{define_module, function, Error, RArray, RHash, TryConvert};
 use std::sync::Mutex;
+use once_cell::sync::Lazy;
 
-// Store only the default configuration, not a tokenizer instance
-static DEFAULT_CONFIG: Mutex<TokenizerConfig> = Mutex::new(TokenizerConfig {
-    strategy: TokenizerStrategy::Unicode,
-    lowercase: true,
-    remove_punctuation: false,
-    preserve_patterns: Vec::new(),
-});
-
-// Create a fresh tokenizer for each tokenize call
-fn tokenize(text: String) -> std::result::Result<Vec<String>, Error> {
-    // Get current default config
-    let config = DEFAULT_CONFIG
-        .lock()
-        .map_err(|e| TokenizerError::MutexError(e.to_string()))?
-        .clone();
-
-    // Create fresh tokenizer from config
-    let tokenizer = tokenizer::from_config(config)?;
-
-    // Tokenize and return
-    Ok(tokenizer.tokenize(&text))
+// Store the default configuration and a cached tokenizer
+struct TokenizerCache {
+    config: TokenizerConfig,
+    tokenizer: Option<Box<dyn tokenizer::Tokenizer + Send + Sync>>,
 }
 
-// Configure sets the default configuration
+static DEFAULT_CACHE: Lazy<Mutex<TokenizerCache>> = Lazy::new(|| {
+    Mutex::new(TokenizerCache {
+        config: TokenizerConfig::default(),
+        tokenizer: None,
+    })
+});
+
+// Use cached tokenizer if config hasn't changed
+fn tokenize(text: String) -> std::result::Result<Vec<String>, Error> {
+    let mut cache = DEFAULT_CACHE
+        .lock()
+        .map_err(|e| TokenizerError::MutexError(e.to_string()))?;
+
+    // Check if we need to create a new tokenizer
+    if cache.tokenizer.is_none() {
+        let tokenizer = tokenizer::from_config(cache.config.clone())?;
+        cache.tokenizer = Some(tokenizer);
+    }
+
+    // Use the cached tokenizer
+    let result = cache
+        .tokenizer
+        .as_ref()
+        .unwrap()
+        .tokenize(&text);
+
+    Ok(result)
+}
+
+// Configure sets the default configuration and invalidates cache
 fn configure(config_hash: RHash) -> std::result::Result<(), Error> {
     let config = parse_config_from_hash(config_hash)?;
 
-    // Update default config
-    let mut default = DEFAULT_CONFIG
+    // Update cache with new config and clear tokenizer
+    let mut cache = DEFAULT_CACHE
         .lock()
         .map_err(|e| TokenizerError::MutexError(e.to_string()))?;
-    *default = config;
+    cache.config = config;
+    cache.tokenizer = None; // Invalidate cached tokenizer
 
     Ok(())
 }
 
 // Reset to factory defaults
 fn reset() -> std::result::Result<(), Error> {
-    let mut default = DEFAULT_CONFIG
+    let mut cache = DEFAULT_CACHE
         .lock()
         .map_err(|e| TokenizerError::MutexError(e.to_string()))?;
-    *default = TokenizerConfig::default();
+    cache.config = TokenizerConfig::default();
+    cache.tokenizer = None; // Clear cached tokenizer
     Ok(())
 }
 
 // Get current default configuration
 fn config_hash() -> std::result::Result<RHash, Error> {
-    let config = DEFAULT_CONFIG
+    let cache = DEFAULT_CACHE
         .lock()
-        .map_err(|e| TokenizerError::MutexError(e.to_string()))?
-        .clone();
+        .map_err(|e| TokenizerError::MutexError(e.to_string()))?;
 
-    config_to_hash(&config)
+    config_to_hash(&cache.config)
 }
 
 // Helper function to convert config to RHash
