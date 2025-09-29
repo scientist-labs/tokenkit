@@ -1,25 +1,16 @@
-use super::{apply_preserve_patterns, post_process_with_preserved, Tokenizer};
+use super::{apply_preserve_patterns, post_process_with_preserved, BaseTokenizerFields, Tokenizer};
 use crate::config::TokenizerConfig;
-use regex::Regex;
 
 pub struct PathHierarchyTokenizer {
-    config: TokenizerConfig,
+    base: BaseTokenizerFields,
     delimiter: String,
-    preserve_patterns: Vec<Regex>,
 }
 
 impl PathHierarchyTokenizer {
     pub fn new(config: TokenizerConfig, delimiter: String) -> Self {
-        let preserve_patterns = config
-            .preserve_patterns
-            .iter()
-            .filter_map(|p| Regex::new(p).ok())
-            .collect();
-
         Self {
-            config,
+            base: BaseTokenizerFields::new(config),
             delimiter,
-            preserve_patterns,
         }
     }
 
@@ -58,15 +49,15 @@ impl Tokenizer for PathHierarchyTokenizer {
 
         let tokens = self.generate_hierarchy(trimmed);
 
-        if !self.preserve_patterns.is_empty() {
+        if self.base.has_preserve_patterns() {
             // Apply preserve_patterns to maintain original case for matched patterns
-            apply_preserve_patterns(tokens, &self.preserve_patterns, trimmed, &self.config)
+            apply_preserve_patterns(tokens, self.base.preserve_patterns(), trimmed, self.base.config())
         } else {
-            post_process_with_preserved(tokens, &self.config, Some(&self.delimiter))
+            post_process_with_preserved(tokens, self.base.config(), Some(&self.delimiter))
         }
     }
 
     fn config(&self) -> &TokenizerConfig {
-        &self.config
+        self.base.config()
     }
 }

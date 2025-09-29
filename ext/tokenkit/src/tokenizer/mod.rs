@@ -1,3 +1,4 @@
+mod base;
 mod whitespace;
 mod unicode;
 mod pattern;
@@ -11,6 +12,8 @@ mod url_email;
 mod char_group;
 mod letter;
 mod lowercase;
+
+pub(crate) use base::BaseTokenizerFields;
 
 pub use whitespace::WhitespaceTokenizer;
 pub use unicode::UnicodeTokenizer;
