@@ -105,7 +105,4 @@ impl Tokenizer for UrlEmailTokenizer {
         result
     }
 
-    fn config(&self) -> &TokenizerConfig {
-        &self.config
-    }
 }

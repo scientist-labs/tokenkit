@@ -34,7 +34,6 @@ use regex::Regex;
 
 pub trait Tokenizer: Send + Sync {
     fn tokenize(&self, text: &str) -> Vec<String>;
-    fn config(&self) -> &TokenizerConfig;
 }
 
 pub fn from_config(config: TokenizerConfig) -> Result<Box<dyn Tokenizer>, String> {

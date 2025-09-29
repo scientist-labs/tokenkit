@@ -22,7 +22,7 @@ impl Tokenizer for UnicodeTokenizer {
                 .map(|s| s.to_string())
                 .collect();
 
-            return apply_preserve_patterns(tokens, self.base.preserve_patterns(), text, self.base.config());
+            return apply_preserve_patterns(tokens, self.base.preserve_patterns(), text, &self.base.config);
         }
 
         let tokens: Vec<String> = text
@@ -30,10 +30,7 @@ impl Tokenizer for UnicodeTokenizer {
             .map(|s| s.to_string())
             .collect();
 
-        post_process(tokens, self.base.config())
+        post_process(tokens, &self.base.config)
     }
 
-    fn config(&self) -> &TokenizerConfig {
-        self.base.config()
-    }
 }

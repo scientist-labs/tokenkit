@@ -41,13 +41,10 @@ impl Tokenizer for CharGroupTokenizer {
         }
 
         if self.base.has_preserve_patterns() {
-            apply_preserve_patterns(tokens, self.base.preserve_patterns(), text, self.base.config())
+            apply_preserve_patterns(tokens, self.base.preserve_patterns(), text, &self.base.config)
         } else {
-            post_process(tokens, self.base.config())
+            post_process(tokens, &self.base.config)
         }
     }
 
-    fn config(&self) -> &TokenizerConfig {
-        self.base.config()
-    }
 }

@@ -16,7 +16,7 @@ impl SentenceTokenizer {
 
 impl SentenceTokenizer {
     fn apply_patterns_to_sentence(&self, sentence: &str) -> String {
-        if self.base.preserve_patterns().is_empty() || !self.base.config().lowercase {
+        if self.base.preserve_patterns().is_empty() || !self.base.config.lowercase {
             return sentence.to_string();
         }
 
@@ -65,7 +65,7 @@ impl Tokenizer for SentenceTokenizer {
             .collect();
 
         // Apply preserve patterns to each sentence
-        if self.base.has_preserve_patterns() && self.base.config().lowercase {
+        if self.base.has_preserve_patterns() && self.base.config.lowercase {
             sentences = sentences
                 .into_iter()
                 .map(|sentence| self.apply_patterns_to_sentence(&sentence))
@@ -73,7 +73,7 @@ impl Tokenizer for SentenceTokenizer {
 
             // Don't call post_process since we already handled lowercasing with patterns
             // Just handle remove_punctuation if needed
-            if self.base.config().remove_punctuation {
+            if self.base.config.remove_punctuation {
                 sentences = sentences
                     .into_iter()
                     .map(|s| s.chars().filter(|c| !c.is_ascii_punctuation()).collect())
@@ -82,11 +82,8 @@ impl Tokenizer for SentenceTokenizer {
             }
             sentences
         } else {
-            post_process(sentences, self.base.config())
+            post_process(sentences, &self.base.config)
         }
     }
 
-    fn config(&self) -> &TokenizerConfig {
-        self.base.config()
-    }
 }

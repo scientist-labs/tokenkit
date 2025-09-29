@@ -51,13 +51,10 @@ impl Tokenizer for PathHierarchyTokenizer {
 
         if self.base.has_preserve_patterns() {
             // Apply preserve_patterns to maintain original case for matched patterns
-            apply_preserve_patterns(tokens, self.base.preserve_patterns(), trimmed, self.base.config())
+            apply_preserve_patterns(tokens, self.base.preserve_patterns(), trimmed, &self.base.config)
         } else {
-            post_process_with_preserved(tokens, self.base.config(), Some(&self.delimiter))
+            post_process_with_preserved(tokens, &self.base.config, Some(&self.delimiter))
         }
     }
 
-    fn config(&self) -> &TokenizerConfig {
-        self.base.config()
-    }
 }

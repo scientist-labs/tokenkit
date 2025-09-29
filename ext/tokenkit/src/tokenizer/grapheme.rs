@@ -23,7 +23,4 @@ impl Tokenizer for GraphemeTokenizer {
         post_process(graphemes, &self.config)
     }
 
-    fn config(&self) -> &TokenizerConfig {
-        &self.config
-    }
 }

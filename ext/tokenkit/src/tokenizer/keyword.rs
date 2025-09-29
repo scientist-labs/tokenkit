@@ -22,7 +22,4 @@ impl Tokenizer for KeywordTokenizer {
         post_process(tokens, &self.config)
     }
 
-    fn config(&self) -> &TokenizerConfig {
-        &self.config
-    }
 }

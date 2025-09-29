@@ -40,7 +40,7 @@ impl Tokenizer for LowercaseTokenizer {
         if self.base.has_preserve_patterns() {
             // For preserve_patterns, we need to pass a modified config that doesn't lowercase
             // because apply_preserve_patterns handles lowercasing for non-preserved tokens
-            let mut modified_config = self.base.config().clone();
+            let mut modified_config = self.base.config.clone();
             modified_config.lowercase = true; // Force lowercase for non-preserved tokens
             apply_preserve_patterns(tokens, self.base.preserve_patterns(), text, &modified_config)
         } else {
@@ -48,7 +48,4 @@ impl Tokenizer for LowercaseTokenizer {
         }
     }
 
-    fn config(&self) -> &TokenizerConfig {
-        self.base.config()
-    }
 }

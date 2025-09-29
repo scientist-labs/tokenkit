@@ -70,7 +70,4 @@ impl Tokenizer for EdgeNgramTokenizer {
         result
     }
 
-    fn config(&self) -> &TokenizerConfig {
-        &self.config
-    }
 }

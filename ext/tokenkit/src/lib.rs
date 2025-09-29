@@ -4,7 +4,6 @@ mod tokenizer;
 use config::{TokenizerConfig, TokenizerStrategy};
 use magnus::{define_module, function, Error, RArray, RHash, TryConvert};
 use std::sync::Mutex;
-use tokenizer::Tokenizer;
 
 // Store only the default configuration, not a tokenizer instance
 static DEFAULT_CONFIG: Mutex<TokenizerConfig> = Mutex::new(TokenizerConfig {
@@ -232,12 +231,10 @@ fn parse_config_from_hash(config_hash: RHash) -> Result<TokenizerConfig, Error> 
     let preserve_patterns = if let Some(val) = preserve_patterns_val {
         let array: RArray = TryConvert::try_convert(val)?;
         let mut patterns = Vec::new();
-        unsafe {
-            for idx in 0..array.len() {
-                let item = array.entry(idx as isize)?;
-                let pattern_str: String = TryConvert::try_convert(item)?;
-                patterns.push(pattern_str);
-            }
+        for idx in 0..array.len() {
+            let item = array.entry(idx as isize)?;
+            let pattern_str: String = TryConvert::try_convert(item)?;
+            patterns.push(pattern_str);
         }
         patterns
     } else {

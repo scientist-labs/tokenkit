@@ -34,9 +34,6 @@ impl BaseTokenizerFields {
         }
     }
 
-    pub fn config(&self) -> &TokenizerConfig {
-        &self.config
-    }
 
     pub fn has_preserve_patterns(&self) -> bool {
         !self.preserve_patterns.is_empty()
