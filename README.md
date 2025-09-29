@@ -1,4 +1,4 @@
-# TokenKit
+<img src="/docs/assets/tokenkit-wide.png" alt="tokenkit" height="120px">
 
 Fast, Rust-backed word-level tokenization for Ruby with pattern preservation.
 
