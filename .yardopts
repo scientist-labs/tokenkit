@@ -1,0 +1,12 @@
+--no-private
+--markup markdown
+--markup-provider redcarpet
+--output-dir doc
+--title "TokenKit Documentation"
+--main README.md
+--files LICENSE.txt,docs/*.md
+lib/**/*.rb
+-
+README.md
+docs/ARCHITECTURE.md
+docs/PERFORMANCE.md

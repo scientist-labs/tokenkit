@@ -148,7 +148,7 @@ RSpec.describe "Path Hierarchy Tokenizer" do
     # The apply_preserve_patterns function doesn't understand hierarchical structure
     # These tests are skipped until a custom implementation is developed
 
-    xit "preserves version patterns in paths" do
+    it "preserves version patterns in paths" do
       TokenKit.configure do |config|
         config.strategy = :path_hierarchy
         config.delimiter = "/"
@@ -165,7 +165,7 @@ RSpec.describe "Path Hierarchy Tokenizer" do
       ])
     end
 
-    xit "preserves UUID patterns in paths" do
+    it "preserves UUID patterns in paths" do
       TokenKit.configure do |config|
         config.strategy = :path_hierarchy
         config.delimiter = "/"
@@ -178,7 +178,7 @@ RSpec.describe "Path Hierarchy Tokenizer" do
       expect(tokens.join(" ")).to include(uuid)  # UUID should be preserved
     end
 
-    xit "preserves environment variables in paths" do
+    it "preserves environment variables in paths" do
       TokenKit.configure do |config|
         config.strategy = :path_hierarchy
         config.delimiter = "/"
@@ -196,7 +196,7 @@ RSpec.describe "Path Hierarchy Tokenizer" do
       ])
     end
 
-    xit "preserves Windows-style paths" do
+    it "preserves Windows-style paths" do
       TokenKit.configure do |config|
         config.strategy = :path_hierarchy
         config.delimiter = "\\"
@@ -213,7 +213,7 @@ RSpec.describe "Path Hierarchy Tokenizer" do
       ])
     end
 
-    xit "works with remove_punctuation" do
+    it "works with remove_punctuation" do
       TokenKit.configure do |config|
         config.strategy = :path_hierarchy
         config.delimiter = "/"
@@ -230,7 +230,7 @@ RSpec.describe "Path Hierarchy Tokenizer" do
       ])
     end
 
-    xit "preserves API versioning patterns" do
+    it "preserves API versioning patterns" do
       TokenKit.configure do |config|
         config.strategy = :path_hierarchy
         config.delimiter = "/"
@@ -246,7 +246,7 @@ RSpec.describe "Path Hierarchy Tokenizer" do
       ])
     end
 
-    xit "preserves timestamp patterns in log paths" do
+    it "preserves timestamp patterns in log paths" do
       TokenKit.configure do |config|
         config.strategy = :path_hierarchy
         config.delimiter = "/"

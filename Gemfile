@@ -6,3 +6,13 @@ source "https://rubygems.org"
 gemspec
 
 gem "irb"
+
+# Benchmarking
+gem "benchmark-ips"
+gem "benchmark-memory"
+
+# Documentation
+group :development do
+  gem "yard", "~> 0.9"
+  gem "redcarpet", "~> 3.6"  # For Markdown in YARD
+end

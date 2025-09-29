@@ -1,31 +1,142 @@
 mod config;
+mod error;
 mod tokenizer;
 
 use config::{TokenizerConfig, TokenizerStrategy};
+use error::TokenizerError;
 use magnus::{define_module, function, Error, RArray, RHash, TryConvert};
-use std::cell::RefCell;
-use tokenizer::Tokenizer;
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
 
-thread_local! {
-    static TOKENIZER: RefCell<Option<Box<dyn Tokenizer>>> = RefCell::new(None);
+// Store the default configuration and a cached tokenizer
+struct TokenizerCache {
+    config: TokenizerConfig,
+    tokenizer: Option<Box<dyn tokenizer::Tokenizer + Send + Sync>>,
 }
 
-fn tokenize(text: String) -> Result<Vec<String>, Error> {
-    TOKENIZER.with(|t| {
-        let tokenizer = t.borrow();
-        if let Some(ref tok) = *tokenizer {
-            Ok(tok.tokenize(&text))
-        } else {
-            let default_config = TokenizerConfig::default();
-            let tok = tokenizer::from_config(default_config)
-                .map_err(|e| Error::new(magnus::exception::runtime_error(), e))?;
-            let result = tok.tokenize(&text);
-            Ok(result)
-        }
+static DEFAULT_CACHE: Lazy<Mutex<TokenizerCache>> = Lazy::new(|| {
+    Mutex::new(TokenizerCache {
+        config: TokenizerConfig::default(),
+        tokenizer: None,
     })
+});
+
+// Use cached tokenizer if config hasn't changed
+fn tokenize(text: String) -> std::result::Result<Vec<String>, Error> {
+    let mut cache = DEFAULT_CACHE
+        .lock()
+        .map_err(|e| TokenizerError::MutexError(e.to_string()))?;
+
+    // Check if we need to create a new tokenizer
+    if cache.tokenizer.is_none() {
+        let tokenizer = tokenizer::from_config(cache.config.clone())?;
+        cache.tokenizer = Some(tokenizer);
+    }
+
+    // Use the cached tokenizer
+    let result = cache
+        .tokenizer
+        .as_ref()
+        .unwrap()
+        .tokenize(&text);
+
+    Ok(result)
 }
 
-fn configure(config_hash: RHash) -> Result<(), Error> {
+// Configure sets the default configuration and invalidates cache
+fn configure(config_hash: RHash) -> std::result::Result<(), Error> {
+    let config = parse_config_from_hash(config_hash)?;
+
+    // Update cache with new config and clear tokenizer
+    let mut cache = DEFAULT_CACHE
+        .lock()
+        .map_err(|e| TokenizerError::MutexError(e.to_string()))?;
+    cache.config = config;
+    cache.tokenizer = None; // Invalidate cached tokenizer
+
+    Ok(())
+}
+
+// Reset to factory defaults
+fn reset() -> std::result::Result<(), Error> {
+    let mut cache = DEFAULT_CACHE
+        .lock()
+        .map_err(|e| TokenizerError::MutexError(e.to_string()))?;
+    cache.config = TokenizerConfig::default();
+    cache.tokenizer = None; // Clear cached tokenizer
+    Ok(())
+}
+
+// Get current default configuration
+fn config_hash() -> std::result::Result<RHash, Error> {
+    let cache = DEFAULT_CACHE
+        .lock()
+        .map_err(|e| TokenizerError::MutexError(e.to_string()))?;
+
+    config_to_hash(&cache.config)
+}
+
+// Helper function to convert config to RHash
+fn config_to_hash(config: &TokenizerConfig) -> std::result::Result<RHash, Error> {
+    let hash = RHash::new();
+
+    let strategy_str = match &config.strategy {
+        TokenizerStrategy::Whitespace => "whitespace",
+        TokenizerStrategy::Unicode => "unicode",
+        TokenizerStrategy::Pattern { .. } => "pattern",
+        TokenizerStrategy::Sentence => "sentence",
+        TokenizerStrategy::Grapheme { .. } => "grapheme",
+        TokenizerStrategy::Keyword => "keyword",
+        TokenizerStrategy::EdgeNgram { .. } => "edge_ngram",
+        TokenizerStrategy::Ngram { .. } => "ngram",
+        TokenizerStrategy::PathHierarchy { .. } => "path_hierarchy",
+        TokenizerStrategy::UrlEmail => "url_email",
+        TokenizerStrategy::CharGroup { .. } => "char_group",
+        TokenizerStrategy::Letter => "letter",
+        TokenizerStrategy::Lowercase => "lowercase",
+    };
+    hash.aset("strategy", strategy_str)?;
+
+    if let TokenizerStrategy::Pattern { regex } = &config.strategy {
+        hash.aset("regex", regex.as_str())?;
+    }
+
+    if let TokenizerStrategy::Grapheme { extended } = &config.strategy {
+        hash.aset("extended", *extended)?;
+    }
+
+    if let TokenizerStrategy::EdgeNgram { min_gram, max_gram } = &config.strategy {
+        hash.aset("min_gram", *min_gram)?;
+        hash.aset("max_gram", *max_gram)?;
+    }
+
+    if let TokenizerStrategy::PathHierarchy { delimiter } = &config.strategy {
+        hash.aset("delimiter", delimiter.as_str())?;
+    }
+
+    if let TokenizerStrategy::Ngram { min_gram, max_gram } = &config.strategy {
+        hash.aset("min_gram", *min_gram)?;
+        hash.aset("max_gram", *max_gram)?;
+    }
+
+    if let TokenizerStrategy::CharGroup { split_on_chars } = &config.strategy {
+        hash.aset("split_on_chars", split_on_chars.as_str())?;
+    }
+
+    hash.aset("lowercase", config.lowercase)?;
+    hash.aset("remove_punctuation", config.remove_punctuation)?;
+
+    let patterns = RArray::new();
+    for pattern in &config.preserve_patterns {
+        patterns.push(pattern.as_str())?;
+    }
+    hash.aset("preserve_patterns", patterns)?;
+
+    Ok(hash)
+}
+
+// Parse config from Ruby hash
+fn parse_config_from_hash(config_hash: RHash) -> std::result::Result<TokenizerConfig, Error> {
     let strategy_val = config_hash.get("strategy");
     let strategy = if let Some(val) = strategy_val {
         let strategy_str: String = TryConvert::try_convert(val)?;
@@ -36,9 +147,8 @@ fn configure(config_hash: RHash) -> Result<(), Error> {
                 let regex_val = config_hash
                     .get("regex")
                     .ok_or_else(|| {
-                        Error::new(
-                            magnus::exception::arg_error(),
-                            "pattern strategy requires regex parameter",
+                        TokenizerError::InvalidConfiguration(
+                            "pattern strategy requires regex parameter".to_string()
                         )
                     })?;
                 let regex: String = TryConvert::try_convert(regex_val)?;
@@ -106,7 +216,9 @@ fn configure(config_hash: RHash) -> Result<(), Error> {
             }
             "letter" => TokenizerStrategy::Letter,
             "lowercase" => TokenizerStrategy::Lowercase,
-            _ => TokenizerStrategy::Unicode,
+            _ => {
+                return Err(TokenizerError::UnknownStrategy(strategy_str).into())
+            }
         }
     } else {
         TokenizerStrategy::Unicode
@@ -127,9 +239,15 @@ fn configure(config_hash: RHash) -> Result<(), Error> {
     };
 
     let preserve_patterns_val = config_hash.get("preserve_patterns");
-    let preserve_patterns: Vec<String> = if let Some(val) = preserve_patterns_val {
-        let patterns_array: RArray = TryConvert::try_convert(val)?;
-        patterns_array.to_vec()?
+    let preserve_patterns = if let Some(val) = preserve_patterns_val {
+        let array: RArray = TryConvert::try_convert(val)?;
+        let mut patterns = Vec::new();
+        for idx in 0..array.len() {
+            let item = array.entry(idx as isize)?;
+            let pattern_str: String = TryConvert::try_convert(item)?;
+            patterns.push(pattern_str);
+        }
+        patterns
     } else {
         Vec::new()
     };
@@ -141,105 +259,88 @@ fn configure(config_hash: RHash) -> Result<(), Error> {
         preserve_patterns,
     };
 
-    let tokenizer = tokenizer::from_config(config)
-        .map_err(|e| Error::new(magnus::exception::runtime_error(), e))?;
+    // Validate the configuration
+    validate_config(&config)?;
 
-    TOKENIZER.with(|t| {
-        *t.borrow_mut() = Some(tokenizer);
-    });
-
-    Ok(())
+    Ok(config)
 }
 
-fn reset() -> Result<(), Error> {
-    TOKENIZER.with(|t| {
-        *t.borrow_mut() = None;
-    });
-    Ok(())
-}
+// Validate configuration parameters
+fn validate_config(config: &TokenizerConfig) -> std::result::Result<(), TokenizerError> {
+    use TokenizerStrategy::*;
 
-fn config_hash() -> Result<RHash, Error> {
-    TOKENIZER.with(|t| {
-        let tokenizer = t.borrow();
-        if let Some(ref tok) = *tokenizer {
-            let config = tok.config();
-            let hash = RHash::new();
-
-            let strategy_str = match &config.strategy {
-                TokenizerStrategy::Whitespace => "whitespace",
-                TokenizerStrategy::Unicode => "unicode",
-                TokenizerStrategy::Pattern { .. } => "pattern",
-                TokenizerStrategy::Sentence => "sentence",
-                TokenizerStrategy::Grapheme { .. } => "grapheme",
-                TokenizerStrategy::Keyword => "keyword",
-                TokenizerStrategy::EdgeNgram { .. } => "edge_ngram",
-                TokenizerStrategy::Ngram { .. } => "ngram",
-                TokenizerStrategy::PathHierarchy { .. } => "path_hierarchy",
-                TokenizerStrategy::UrlEmail => "url_email",
-                TokenizerStrategy::CharGroup { .. } => "char_group",
-                TokenizerStrategy::Letter => "letter",
-                TokenizerStrategy::Lowercase => "lowercase",
-            };
-            hash.aset("strategy", strategy_str)?;
-
-            if let TokenizerStrategy::Pattern { regex } = &config.strategy {
-                hash.aset("regex", regex.as_str())?;
+    match &config.strategy {
+        EdgeNgram { min_gram, max_gram } | Ngram { min_gram, max_gram } => {
+            if *min_gram == 0 {
+                return Err(TokenizerError::InvalidNgramConfig {
+                    min: *min_gram,
+                    max: *max_gram,
+                });
             }
-
-            if let TokenizerStrategy::Grapheme { extended } = &config.strategy {
-                hash.aset("extended", *extended)?;
+            if min_gram > max_gram {
+                return Err(TokenizerError::InvalidNgramConfig {
+                    min: *min_gram,
+                    max: *max_gram,
+                });
             }
-
-            if let TokenizerStrategy::EdgeNgram { min_gram, max_gram } = &config.strategy {
-                hash.aset("min_gram", *min_gram)?;
-                hash.aset("max_gram", *max_gram)?;
-            }
-
-            if let TokenizerStrategy::PathHierarchy { delimiter } = &config.strategy {
-                hash.aset("delimiter", delimiter.as_str())?;
-            }
-
-            if let TokenizerStrategy::Ngram { min_gram, max_gram } = &config.strategy {
-                hash.aset("min_gram", *min_gram)?;
-                hash.aset("max_gram", *max_gram)?;
-            }
-
-            if let TokenizerStrategy::CharGroup { split_on_chars } = &config.strategy {
-                hash.aset("split_on_chars", split_on_chars.as_str())?;
-            }
-
-            hash.aset("lowercase", config.lowercase)?;
-            hash.aset("remove_punctuation", config.remove_punctuation)?;
-
-            let patterns = RArray::new();
-            for pattern in &config.preserve_patterns {
-                patterns.push(pattern.as_str())?;
-            }
-            hash.aset("preserve_patterns", patterns)?;
-
-            Ok(hash)
-        } else {
-            let hash = RHash::new();
-            hash.aset("strategy", "unicode")?;
-            hash.aset("lowercase", true)?;
-            hash.aset("remove_punctuation", false)?;
-            hash.aset("preserve_patterns", RArray::new())?;
-            Ok(hash)
         }
-    })
+        PathHierarchy { delimiter } => {
+            if delimiter.is_empty() {
+                return Err(TokenizerError::EmptyDelimiter {
+                    tokenizer: "PathHierarchy".to_string(),
+                });
+            }
+        }
+        Pattern { regex } => {
+            // Validate regex pattern
+            regex::Regex::new(regex).map_err(|e| TokenizerError::InvalidRegex {
+                pattern: regex.clone(),
+                error: e.to_string(),
+            })?;
+        }
+        _ => {}
+    }
+
+    // Validate preserve patterns
+    for pattern in &config.preserve_patterns {
+        regex::Regex::new(pattern).map_err(|e| TokenizerError::InvalidRegex {
+            pattern: pattern.clone(),
+            error: e.to_string(),
+        })?;
+    }
+
+    Ok(())
 }
 
-fn load_config(config_hash: RHash) -> Result<(), Error> {
+// Load config is just an alias for configure (for backward compat)
+fn load_config(config_hash: RHash) -> std::result::Result<(), Error> {
     configure(config_hash)
 }
 
+// Tokenize with a specific config (creates fresh tokenizer)
+fn tokenize_with_config(text: String, config_hash: RHash) -> std::result::Result<Vec<String>, Error> {
+    let config = parse_config_from_hash(config_hash)?;
+
+    // Create fresh tokenizer from config
+    let tokenizer = tokenizer::from_config(config)?;
+
+    // Tokenize and return
+    Ok(tokenizer.tokenize(&text))
+}
+
 #[magnus::init]
-fn init(_ruby: &magnus::Ruby) -> Result<(), Error> {
+fn init(_ruby: &magnus::Ruby) -> std::result::Result<(), Error> {
     let module = define_module("TokenKit")?;
+
+    // Public API functions
     module.define_module_function("_tokenize", function!(tokenize, 1))?;
     module.define_module_function("_configure", function!(configure, 1))?;
     module.define_module_function("_reset", function!(reset, 0))?;
     module.define_module_function("_config_hash", function!(config_hash, 0))?;
     module.define_module_function("_load_config", function!(load_config, 1))?;
+
+    // New instance-based function
+    module.define_module_function("_tokenize_with_config", function!(tokenize_with_config, 2))?;
+
     Ok(())
 }

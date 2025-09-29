@@ -1,27 +1,21 @@
-use super::{apply_preserve_patterns, post_process, Tokenizer};
+use super::{apply_preserve_patterns, post_process, BaseTokenizerFields, Tokenizer};
 use crate::config::TokenizerConfig;
+use crate::error::Result;
 use regex::Regex;
 
 pub struct PatternTokenizer {
-    config: TokenizerConfig,
+    base: BaseTokenizerFields,
     pattern: Regex,
-    preserve_patterns: Vec<Regex>,
 }
 
 impl PatternTokenizer {
-    pub fn new(regex: &str, config: TokenizerConfig) -> Result<Self, String> {
-        let pattern = Regex::new(regex).map_err(|e| format!("Invalid regex pattern: {}", e))?;
-
-        let preserve_patterns = config
-            .preserve_patterns
-            .iter()
-            .filter_map(|p| Regex::new(p).ok())
-            .collect();
+    pub fn new(regex: &str, config: TokenizerConfig) -> Result<Self> {
+        // Pattern is already validated in validate_config(), safe to unwrap
+        let pattern = Regex::new(regex).expect("Pattern should have been validated");
 
         Ok(Self {
-            config,
+            base: BaseTokenizerFields::new(config),
             pattern,
-            preserve_patterns,
         })
     }
 }
@@ -34,14 +28,11 @@ impl Tokenizer for PatternTokenizer {
             .map(|mat| mat.as_str().to_string())
             .collect();
 
-        if !self.preserve_patterns.is_empty() {
-            apply_preserve_patterns(tokens, &self.preserve_patterns, text, &self.config)
+        if self.base.has_preserve_patterns() {
+            apply_preserve_patterns(tokens, self.base.preserve_patterns(), text, &self.base.config)
         } else {
-            post_process(tokens, &self.config)
+            post_process(tokens, &self.base.config)
         }
     }
 
-    fn config(&self) -> &TokenizerConfig {
-        &self.config
-    }
 }

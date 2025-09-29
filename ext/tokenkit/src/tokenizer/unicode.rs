@@ -1,37 +1,28 @@
-use super::{apply_preserve_patterns, post_process, Tokenizer};
+use super::{apply_preserve_patterns, post_process, BaseTokenizerFields, Tokenizer};
 use crate::config::TokenizerConfig;
-use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
 pub struct UnicodeTokenizer {
-    config: TokenizerConfig,
-    preserve_patterns: Vec<Regex>,
+    base: BaseTokenizerFields,
 }
 
 impl UnicodeTokenizer {
     pub fn new(config: TokenizerConfig) -> Self {
-        let preserve_patterns = config
-            .preserve_patterns
-            .iter()
-            .filter_map(|p| Regex::new(p).ok())
-            .collect();
-
         Self {
-            config,
-            preserve_patterns,
+            base: BaseTokenizerFields::new(config),
         }
     }
 }
 
 impl Tokenizer for UnicodeTokenizer {
     fn tokenize(&self, text: &str) -> Vec<String> {
-        if !self.preserve_patterns.is_empty() {
+        if self.base.has_preserve_patterns() {
             let tokens = text
                 .unicode_words()
                 .map(|s| s.to_string())
                 .collect();
 
-            return apply_preserve_patterns(tokens, &self.preserve_patterns, text, &self.config);
+            return apply_preserve_patterns(tokens, self.base.preserve_patterns(), text, &self.base.config);
         }
 
         let tokens: Vec<String> = text
@@ -39,10 +30,7 @@ impl Tokenizer for UnicodeTokenizer {
             .map(|s| s.to_string())
             .collect();
 
-        post_process(tokens, &self.config)
+        post_process(tokens, &self.base.config)
     }
 
-    fn config(&self) -> &TokenizerConfig {
-        &self.config
-    }
 }

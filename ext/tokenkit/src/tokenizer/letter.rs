@@ -1,23 +1,14 @@
-use super::{apply_preserve_patterns, post_process, Tokenizer};
+use super::{apply_preserve_patterns, post_process, BaseTokenizerFields, Tokenizer};
 use crate::config::TokenizerConfig;
-use regex::Regex;
 
 pub struct LetterTokenizer {
-    config: TokenizerConfig,
-    preserve_patterns: Vec<Regex>,
+    base: BaseTokenizerFields,
 }
 
 impl LetterTokenizer {
     pub fn new(config: TokenizerConfig) -> Self {
-        let preserve_patterns = config
-            .preserve_patterns
-            .iter()
-            .filter_map(|p| Regex::new(p).ok())
-            .collect();
-
         Self {
-            config,
-            preserve_patterns,
+            base: BaseTokenizerFields::new(config),
         }
     }
 }
@@ -40,14 +31,11 @@ impl Tokenizer for LetterTokenizer {
             tokens.push(current_token);
         }
 
-        if !self.preserve_patterns.is_empty() {
-            apply_preserve_patterns(tokens, &self.preserve_patterns, text, &self.config)
+        if self.base.has_preserve_patterns() {
+            apply_preserve_patterns(tokens, self.base.preserve_patterns(), text, &self.base.config)
         } else {
-            post_process(tokens, &self.config)
+            post_process(tokens, &self.base.config)
         }
     }
 
-    fn config(&self) -> &TokenizerConfig {
-        &self.config
-    }
 }

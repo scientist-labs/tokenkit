@@ -77,7 +77,4 @@ impl Tokenizer for NgramTokenizer {
         result
     }
 
-    fn config(&self) -> &TokenizerConfig {
-        &self.config
-    }
 }

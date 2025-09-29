@@ -1,12 +1,10 @@
-use super::{apply_preserve_patterns, post_process, Tokenizer};
+use super::{apply_preserve_patterns_with_tokenizer, post_process, BaseTokenizerFields, Tokenizer};
 use crate::config::TokenizerConfig;
-use regex::Regex;
 use std::collections::HashSet;
 
 pub struct CharGroupTokenizer {
-    config: TokenizerConfig,
+    base: BaseTokenizerFields,
     split_chars: HashSet<char>,
-    preserve_patterns: Vec<Regex>,
 }
 
 impl CharGroupTokenizer {
@@ -14,22 +12,14 @@ impl CharGroupTokenizer {
         // Note: Empty split_on_chars is valid - it makes the tokenizer behave like
         // a keyword tokenizer (no splitting, returns whole text as single token)
         let split_chars: HashSet<char> = split_on_chars.chars().collect();
-        let preserve_patterns = config
-            .preserve_patterns
-            .iter()
-            .filter_map(|p| Regex::new(p).ok())
-            .collect();
 
         Self {
-            config,
+            base: BaseTokenizerFields::new(config),
             split_chars,
-            preserve_patterns,
         }
     }
-}
 
-impl Tokenizer for CharGroupTokenizer {
-    fn tokenize(&self, text: &str) -> Vec<String> {
+    fn tokenize_text(&self, text: &str) -> Vec<String> {
         let mut tokens = Vec::new();
         let mut current_token = String::new();
 
@@ -48,14 +38,25 @@ impl Tokenizer for CharGroupTokenizer {
             tokens.push(current_token);
         }
 
-        if !self.preserve_patterns.is_empty() {
-            apply_preserve_patterns(tokens, &self.preserve_patterns, text, &self.config)
+        tokens
+    }
+}
+
+impl Tokenizer for CharGroupTokenizer {
+    fn tokenize(&self, text: &str) -> Vec<String> {
+        let tokens = self.tokenize_text(text);
+
+        if self.base.has_preserve_patterns() {
+            apply_preserve_patterns_with_tokenizer(
+                tokens,
+                self.base.preserve_patterns(),
+                text,
+                &self.base.config,
+                |t| self.tokenize_text(t),
+            )
         } else {
-            post_process(tokens, &self.config)
+            post_process(tokens, &self.base.config)
         }
     }
 
-    fn config(&self) -> &TokenizerConfig {
-        &self.config
-    }
 }

@@ -1,37 +1,28 @@
-use super::{post_process, Tokenizer};
+use super::{post_process, BaseTokenizerFields, Tokenizer};
 use crate::config::TokenizerConfig;
-use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
 pub struct SentenceTokenizer {
-    config: TokenizerConfig,
-    preserve_patterns: Vec<Regex>,
+    base: BaseTokenizerFields,
 }
 
 impl SentenceTokenizer {
     pub fn new(config: TokenizerConfig) -> Self {
-        let preserve_patterns = config
-            .preserve_patterns
-            .iter()
-            .filter_map(|p| Regex::new(p).ok())
-            .collect();
-
         Self {
-            config,
-            preserve_patterns,
+            base: BaseTokenizerFields::new(config),
         }
     }
 }
 
 impl SentenceTokenizer {
     fn apply_patterns_to_sentence(&self, sentence: &str) -> String {
-        if self.preserve_patterns.is_empty() || !self.config.lowercase {
+        if self.base.preserve_patterns().is_empty() || !self.base.config.lowercase {
             return sentence.to_string();
         }
 
         // Find all matches in the sentence
         let mut preserved_spans: Vec<(usize, usize, String)> = Vec::new();
-        for pattern in &self.preserve_patterns {
+        for pattern in self.base.preserve_patterns() {
             for mat in pattern.find_iter(sentence) {
                 preserved_spans.push((mat.start(), mat.end(), mat.as_str().to_string()));
             }
@@ -74,7 +65,7 @@ impl Tokenizer for SentenceTokenizer {
             .collect();
 
         // Apply preserve patterns to each sentence
-        if !self.preserve_patterns.is_empty() && self.config.lowercase {
+        if self.base.has_preserve_patterns() && self.base.config.lowercase {
             sentences = sentences
                 .into_iter()
                 .map(|sentence| self.apply_patterns_to_sentence(&sentence))
@@ -82,7 +73,7 @@ impl Tokenizer for SentenceTokenizer {
 
             // Don't call post_process since we already handled lowercasing with patterns
             // Just handle remove_punctuation if needed
-            if self.config.remove_punctuation {
+            if self.base.config.remove_punctuation {
                 sentences = sentences
                     .into_iter()
                     .map(|s| s.chars().filter(|c| !c.is_ascii_punctuation()).collect())
@@ -91,11 +82,8 @@ impl Tokenizer for SentenceTokenizer {
             }
             sentences
         } else {
-            post_process(sentences, &self.config)
+            post_process(sentences, &self.base.config)
         }
     }
 
-    fn config(&self) -> &TokenizerConfig {
-        &self.config
-    }
 }
