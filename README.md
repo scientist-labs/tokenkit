@@ -554,9 +554,21 @@ TokenKit.tokenize("laptop")
 
 ## Performance
 
-- **Unicode tokenization**: ~100K docs/sec (negligible overhead vs. whitespace)
-- **Pattern preservation**: Adds ~10-20% overhead depending on pattern complexity
-- **Thread-safe**: Uses thread-local state for safe concurrent use
+TokenKit has been extensively optimized for production use:
+
+- **Unicode tokenization**: ~870K tokens/sec (baseline)
+- **Pattern preservation**: ~410K tokens/sec with 4 patterns (was 3.6K/sec before v0.3.0 optimizations)
+- **Memory efficient**: Pre-allocated buffers and in-place operations
+- **Thread-safe**: Cached instances with mutex protection, safe for concurrent use
+- **110x speedup**: For pattern-heavy workloads through intelligent caching
+
+Key optimizations:
+- Regex patterns compiled once and cached (not per-tokenization)
+- String allocations minimized through index-based operations
+- Tokenizer instances reused across calls
+- In-place post-processing for lowercase and punctuation removal
+
+See the [Performance Guide](docs/PERFORMANCE.md) for detailed benchmarks and optimization techniques.
 
 ## Integration
 
@@ -565,6 +577,25 @@ TokenKit is designed to work with other gems in the scientist-labs ecosystem:
 - **PhraseKit**: Use TokenKit for consistent phrase extraction
 - **SpellKit**: Tokenize before spell correction
 - **red-candle**: Tokenize before NER/embeddings
+
+## Documentation
+
+- [API Documentation](https://rubydoc.info/gems/tokenkit) - Full API reference
+- [Architecture Guide](docs/ARCHITECTURE.md) - Internal design and structure
+- [Performance Guide](docs/PERFORMANCE.md) - Benchmarks and optimization details
+
+### Generating Documentation Locally
+
+```bash
+# Install documentation dependencies
+bundle install
+
+# Generate YARD documentation
+bundle exec yard doc
+
+# Open documentation in browser
+open doc/index.html
+```
 
 ## Development
 
@@ -576,8 +607,14 @@ bundle exec rake compile
 # Run tests
 bundle exec rspec
 
+# Run tests with coverage
+COVERAGE=true bundle exec rspec
+
 # Run linter
 bundle exec standardrb
+
+# Run benchmarks
+ruby benchmarks/tokenizer_benchmark.rb
 
 # Build gem
 gem build tokenkit.gemspec
