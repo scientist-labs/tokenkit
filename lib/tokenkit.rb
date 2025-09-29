@@ -15,6 +15,31 @@ end
 module TokenKit
   class Error < StandardError; end
 
+  # Instance-based tokenizer for true thread safety
+  class Tokenizer
+    attr_reader :config
+
+    def initialize(config = {})
+      @config = if config.is_a?(Configuration)
+        config
+      elsif config.is_a?(ConfigBuilder)
+        config.build
+      elsif config.is_a?(Hash)
+        builder = TokenKit.config_hash.to_builder
+        config.each do |key, value|
+          builder.send("#{key}=", value) if builder.respond_to?("#{key}=")
+        end
+        builder.build
+      else
+        TokenKit.config_hash
+      end
+    end
+
+    def tokenize(text)
+      TokenKit._tokenize_with_config(text, @config.to_rust_config)
+    end
+  end
+
   extend self
 
   # Thread-safe storage for current configuration
@@ -23,10 +48,11 @@ module TokenKit
 
   def tokenize(text, **opts)
     if opts.any?
-      with_temporary_config(opts) do
-        _tokenize(text)
-      end
+      # Create a fresh tokenizer with merged config
+      merged_config = build_merged_config(opts)
+      _tokenize_with_config(text, merged_config)
     else
+      # Use default config (creates fresh tokenizer internally)
       _tokenize(text)
     end
   end
@@ -104,11 +130,8 @@ module TokenKit
 
   private
 
-  def with_temporary_config(opts)
-    # Save current Rust config
-    previous_config = _config_hash
-
-    # Build temporary config
+  def build_merged_config(opts)
+    # Build config with options merged in
     builder = config_hash.to_builder
 
     # Apply options to builder
@@ -138,16 +161,14 @@ module TokenKit
       end
     end
 
-    temp_config = builder.build
-    _configure(temp_config.to_rust_config)
-
-    yield
-  ensure
-    # Restore previous config
-    _load_config(previous_config) if previous_config
+    builder.build.to_rust_config
   end
 
   def _tokenize(text)
+    raise NotImplementedError, "Native extension not loaded"
+  end
+
+  def _tokenize_with_config(text, config_hash)
     raise NotImplementedError, "Native extension not loaded"
   end
 

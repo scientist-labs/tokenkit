@@ -3,29 +3,126 @@ mod tokenizer;
 
 use config::{TokenizerConfig, TokenizerStrategy};
 use magnus::{define_module, function, Error, RArray, RHash, TryConvert};
-use std::cell::RefCell;
+use std::sync::Mutex;
 use tokenizer::Tokenizer;
 
-thread_local! {
-    static TOKENIZER: RefCell<Option<Box<dyn Tokenizer>>> = RefCell::new(None);
-}
+// Store only the default configuration, not a tokenizer instance
+static DEFAULT_CONFIG: Mutex<TokenizerConfig> = Mutex::new(TokenizerConfig {
+    strategy: TokenizerStrategy::Unicode,
+    lowercase: true,
+    remove_punctuation: false,
+    preserve_patterns: Vec::new(),
+});
 
+// Create a fresh tokenizer for each tokenize call
 fn tokenize(text: String) -> Result<Vec<String>, Error> {
-    TOKENIZER.with(|t| {
-        let tokenizer = t.borrow();
-        if let Some(ref tok) = *tokenizer {
-            Ok(tok.tokenize(&text))
-        } else {
-            let default_config = TokenizerConfig::default();
-            let tok = tokenizer::from_config(default_config)
-                .map_err(|e| Error::new(magnus::exception::runtime_error(), e))?;
-            let result = tok.tokenize(&text);
-            Ok(result)
-        }
-    })
+    // Get current default config
+    let config = DEFAULT_CONFIG
+        .lock()
+        .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))?
+        .clone();
+
+    // Create fresh tokenizer from config
+    let tokenizer = tokenizer::from_config(config)
+        .map_err(|e| Error::new(magnus::exception::runtime_error(), e))?;
+
+    // Tokenize and return
+    Ok(tokenizer.tokenize(&text))
 }
 
+// Configure sets the default configuration
 fn configure(config_hash: RHash) -> Result<(), Error> {
+    let config = parse_config_from_hash(config_hash)?;
+
+    // Update default config
+    let mut default = DEFAULT_CONFIG
+        .lock()
+        .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))?;
+    *default = config;
+
+    Ok(())
+}
+
+// Reset to factory defaults
+fn reset() -> Result<(), Error> {
+    let mut default = DEFAULT_CONFIG
+        .lock()
+        .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))?;
+    *default = TokenizerConfig::default();
+    Ok(())
+}
+
+// Get current default configuration
+fn config_hash() -> Result<RHash, Error> {
+    let config = DEFAULT_CONFIG
+        .lock()
+        .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))?
+        .clone();
+
+    config_to_hash(&config)
+}
+
+// Helper function to convert config to RHash
+fn config_to_hash(config: &TokenizerConfig) -> Result<RHash, Error> {
+    let hash = RHash::new();
+
+    let strategy_str = match &config.strategy {
+        TokenizerStrategy::Whitespace => "whitespace",
+        TokenizerStrategy::Unicode => "unicode",
+        TokenizerStrategy::Pattern { .. } => "pattern",
+        TokenizerStrategy::Sentence => "sentence",
+        TokenizerStrategy::Grapheme { .. } => "grapheme",
+        TokenizerStrategy::Keyword => "keyword",
+        TokenizerStrategy::EdgeNgram { .. } => "edge_ngram",
+        TokenizerStrategy::Ngram { .. } => "ngram",
+        TokenizerStrategy::PathHierarchy { .. } => "path_hierarchy",
+        TokenizerStrategy::UrlEmail => "url_email",
+        TokenizerStrategy::CharGroup { .. } => "char_group",
+        TokenizerStrategy::Letter => "letter",
+        TokenizerStrategy::Lowercase => "lowercase",
+    };
+    hash.aset("strategy", strategy_str)?;
+
+    if let TokenizerStrategy::Pattern { regex } = &config.strategy {
+        hash.aset("regex", regex.as_str())?;
+    }
+
+    if let TokenizerStrategy::Grapheme { extended } = &config.strategy {
+        hash.aset("extended", *extended)?;
+    }
+
+    if let TokenizerStrategy::EdgeNgram { min_gram, max_gram } = &config.strategy {
+        hash.aset("min_gram", *min_gram)?;
+        hash.aset("max_gram", *max_gram)?;
+    }
+
+    if let TokenizerStrategy::PathHierarchy { delimiter } = &config.strategy {
+        hash.aset("delimiter", delimiter.as_str())?;
+    }
+
+    if let TokenizerStrategy::Ngram { min_gram, max_gram } = &config.strategy {
+        hash.aset("min_gram", *min_gram)?;
+        hash.aset("max_gram", *max_gram)?;
+    }
+
+    if let TokenizerStrategy::CharGroup { split_on_chars } = &config.strategy {
+        hash.aset("split_on_chars", split_on_chars.as_str())?;
+    }
+
+    hash.aset("lowercase", config.lowercase)?;
+    hash.aset("remove_punctuation", config.remove_punctuation)?;
+
+    let patterns = RArray::new();
+    for pattern in &config.preserve_patterns {
+        patterns.push(pattern.as_str())?;
+    }
+    hash.aset("preserve_patterns", patterns)?;
+
+    Ok(hash)
+}
+
+// Parse config from Ruby hash
+fn parse_config_from_hash(config_hash: RHash) -> Result<TokenizerConfig, Error> {
     let strategy_val = config_hash.get("strategy");
     let strategy = if let Some(val) = strategy_val {
         let strategy_str: String = TryConvert::try_convert(val)?;
@@ -106,7 +203,12 @@ fn configure(config_hash: RHash) -> Result<(), Error> {
             }
             "letter" => TokenizerStrategy::Letter,
             "lowercase" => TokenizerStrategy::Lowercase,
-            _ => TokenizerStrategy::Unicode,
+            _ => {
+                return Err(Error::new(
+                    magnus::exception::arg_error(),
+                    format!("Unknown tokenizer strategy: {}", strategy_str),
+                ))
+            }
         }
     } else {
         TokenizerStrategy::Unicode
@@ -127,119 +229,59 @@ fn configure(config_hash: RHash) -> Result<(), Error> {
     };
 
     let preserve_patterns_val = config_hash.get("preserve_patterns");
-    let preserve_patterns: Vec<String> = if let Some(val) = preserve_patterns_val {
-        let patterns_array: RArray = TryConvert::try_convert(val)?;
-        patterns_array.to_vec()?
+    let preserve_patterns = if let Some(val) = preserve_patterns_val {
+        let array: RArray = TryConvert::try_convert(val)?;
+        let mut patterns = Vec::new();
+        unsafe {
+            for idx in 0..array.len() {
+                let item = array.entry(idx as isize)?;
+                let pattern_str: String = TryConvert::try_convert(item)?;
+                patterns.push(pattern_str);
+            }
+        }
+        patterns
     } else {
         Vec::new()
     };
 
-    let config = TokenizerConfig {
+    Ok(TokenizerConfig {
         strategy,
         lowercase,
         remove_punctuation,
         preserve_patterns,
-    };
-
-    let tokenizer = tokenizer::from_config(config)
-        .map_err(|e| Error::new(magnus::exception::runtime_error(), e))?;
-
-    TOKENIZER.with(|t| {
-        *t.borrow_mut() = Some(tokenizer);
-    });
-
-    Ok(())
-}
-
-fn reset() -> Result<(), Error> {
-    TOKENIZER.with(|t| {
-        *t.borrow_mut() = None;
-    });
-    Ok(())
-}
-
-fn config_hash() -> Result<RHash, Error> {
-    TOKENIZER.with(|t| {
-        let tokenizer = t.borrow();
-        if let Some(ref tok) = *tokenizer {
-            let config = tok.config();
-            let hash = RHash::new();
-
-            let strategy_str = match &config.strategy {
-                TokenizerStrategy::Whitespace => "whitespace",
-                TokenizerStrategy::Unicode => "unicode",
-                TokenizerStrategy::Pattern { .. } => "pattern",
-                TokenizerStrategy::Sentence => "sentence",
-                TokenizerStrategy::Grapheme { .. } => "grapheme",
-                TokenizerStrategy::Keyword => "keyword",
-                TokenizerStrategy::EdgeNgram { .. } => "edge_ngram",
-                TokenizerStrategy::Ngram { .. } => "ngram",
-                TokenizerStrategy::PathHierarchy { .. } => "path_hierarchy",
-                TokenizerStrategy::UrlEmail => "url_email",
-                TokenizerStrategy::CharGroup { .. } => "char_group",
-                TokenizerStrategy::Letter => "letter",
-                TokenizerStrategy::Lowercase => "lowercase",
-            };
-            hash.aset("strategy", strategy_str)?;
-
-            if let TokenizerStrategy::Pattern { regex } = &config.strategy {
-                hash.aset("regex", regex.as_str())?;
-            }
-
-            if let TokenizerStrategy::Grapheme { extended } = &config.strategy {
-                hash.aset("extended", *extended)?;
-            }
-
-            if let TokenizerStrategy::EdgeNgram { min_gram, max_gram } = &config.strategy {
-                hash.aset("min_gram", *min_gram)?;
-                hash.aset("max_gram", *max_gram)?;
-            }
-
-            if let TokenizerStrategy::PathHierarchy { delimiter } = &config.strategy {
-                hash.aset("delimiter", delimiter.as_str())?;
-            }
-
-            if let TokenizerStrategy::Ngram { min_gram, max_gram } = &config.strategy {
-                hash.aset("min_gram", *min_gram)?;
-                hash.aset("max_gram", *max_gram)?;
-            }
-
-            if let TokenizerStrategy::CharGroup { split_on_chars } = &config.strategy {
-                hash.aset("split_on_chars", split_on_chars.as_str())?;
-            }
-
-            hash.aset("lowercase", config.lowercase)?;
-            hash.aset("remove_punctuation", config.remove_punctuation)?;
-
-            let patterns = RArray::new();
-            for pattern in &config.preserve_patterns {
-                patterns.push(pattern.as_str())?;
-            }
-            hash.aset("preserve_patterns", patterns)?;
-
-            Ok(hash)
-        } else {
-            let hash = RHash::new();
-            hash.aset("strategy", "unicode")?;
-            hash.aset("lowercase", true)?;
-            hash.aset("remove_punctuation", false)?;
-            hash.aset("preserve_patterns", RArray::new())?;
-            Ok(hash)
-        }
     })
 }
 
+// Load config is just an alias for configure (for backward compat)
 fn load_config(config_hash: RHash) -> Result<(), Error> {
     configure(config_hash)
+}
+
+// Tokenize with a specific config (creates fresh tokenizer)
+fn tokenize_with_config(text: String, config_hash: RHash) -> Result<Vec<String>, Error> {
+    let config = parse_config_from_hash(config_hash)?;
+
+    // Create fresh tokenizer from config
+    let tokenizer = tokenizer::from_config(config)
+        .map_err(|e| Error::new(magnus::exception::runtime_error(), e))?;
+
+    // Tokenize and return
+    Ok(tokenizer.tokenize(&text))
 }
 
 #[magnus::init]
 fn init(_ruby: &magnus::Ruby) -> Result<(), Error> {
     let module = define_module("TokenKit")?;
+
+    // Public API functions
     module.define_module_function("_tokenize", function!(tokenize, 1))?;
     module.define_module_function("_configure", function!(configure, 1))?;
     module.define_module_function("_reset", function!(reset, 0))?;
     module.define_module_function("_config_hash", function!(config_hash, 0))?;
     module.define_module_function("_load_config", function!(load_config, 1))?;
+
+    // New instance-based function
+    module.define_module_function("_tokenize_with_config", function!(tokenize_with_config, 2))?;
+
     Ok(())
 }
