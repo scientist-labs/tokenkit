@@ -65,7 +65,7 @@ impl PathHierarchyTokenizer {
         for token in all_tokens {
             // Check if this token should be included
             // Include if: it's a preserved token OR it extends beyond a preserved token
-            let mut should_include = false;
+            let should_include;
             let mut apply_lowercase = self.base.config.lowercase;
 
             if preserved_tokens.contains(&token) {
