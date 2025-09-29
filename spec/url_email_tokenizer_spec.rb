@@ -171,4 +171,85 @@ RSpec.describe "URL/Email Tokenizer" do
       expect(tokens).to include("https://store.example.com", "sales@example.com")
     end
   end
+
+  context "with preserve_patterns" do
+    it "preserves patterns alongside URLs and emails" do
+      TokenKit.configure do |config|
+        config.strategy = :url_email
+        config.lowercase = true
+        config.preserve_patterns = [/TICKET-\d+/, /SKU-\d+/]
+      end
+
+      tokens = TokenKit.tokenize("TICKET-123 email support@example.com about SKU-456")
+      expect(tokens).to eq(["TICKET-123", "email", "support@example.com", "about", "SKU-456"])
+    end
+
+    it "preserves gene names with scientific URLs" do
+      TokenKit.configure do |config|
+        config.strategy = :url_email
+        config.lowercase = true
+        config.preserve_patterns = [/BRCA\d+/, /TP\d+/]
+      end
+
+      tokens = TokenKit.tokenize("BRCA1 info at https://www.ncbi.nlm.nih.gov/gene/672 and TP53")
+      expect(tokens).to eq(["BRCA1", "info", "at", "https://www.ncbi.nlm.nih.gov/gene/672", "and", "TP53"])
+    end
+
+    it "preserves measurements in support content" do
+      TokenKit.configure do |config|
+        config.strategy = :url_email
+        config.lowercase = true
+        config.preserve_patterns = [/\d+(GB|MB|KB)/i]
+      end
+
+      tokens = TokenKit.tokenize("Upload 100MB to https://upload.example.com or email admin@example.com")
+      expect(tokens).to eq(["upload", "100MB", "to", "https://upload.example.com", "or", "email", "admin@example.com"])
+    end
+
+    it "handles overlapping patterns" do
+      TokenKit.configure do |config|
+        config.strategy = :url_email
+        config.lowercase = true
+        config.preserve_patterns = [/support@example\.com/]
+      end
+
+      # URL detector already finds support@example.com as email, pattern should not duplicate
+      tokens = TokenKit.tokenize("Contact support@example.com today")
+      expect(tokens).to eq(["contact", "support@example.com", "today"])
+    end
+
+    it "preserves version patterns with download URLs" do
+      TokenKit.configure do |config|
+        config.strategy = :url_email
+        config.lowercase = true
+        config.preserve_patterns = [/v\d+\.\d+\.\d+/]
+      end
+
+      tokens = TokenKit.tokenize("Download v2.1.3 from https://downloads.example.com")
+      expect(tokens).to eq(["download", "v2.1.3", "from", "https://downloads.example.com"])
+    end
+
+    it "works with remove_punctuation" do
+      TokenKit.configure do |config|
+        config.strategy = :url_email
+        config.lowercase = true
+        config.remove_punctuation = true
+        config.preserve_patterns = [/API-\d+/]
+      end
+
+      tokens = TokenKit.tokenize("API-123! Visit https://api.example.com now!")
+      expect(tokens).to eq(["API-123", "visit", "https://api.example.com", "now"])
+    end
+
+    it "preserves hashtags and mentions" do
+      TokenKit.configure do |config|
+        config.strategy = :url_email
+        config.lowercase = true
+        config.preserve_patterns = [/#\w+/, /@\w+/]
+      end
+
+      tokens = TokenKit.tokenize("#News @User check https://example.com")
+      expect(tokens).to eq(["#News", "@User", "check", "https://example.com"])
+    end
+  end
 end

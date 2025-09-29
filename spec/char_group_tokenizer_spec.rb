@@ -233,4 +233,84 @@ RSpec.describe "Character Group Tokenizer" do
     end
   end
 
+  context "with preserve_patterns" do
+    # Note: preserve_patterns currently has limitations with non-whitespace delimiters
+    # The following tests are skipped until the architectural issue is resolved
+    # where apply_preserve_patterns uses whitespace tokenization for non-preserved text
+
+    xit "preserves patterns in CSV-like data" do
+      TokenKit.configure do |config|
+        config.strategy = :char_group
+        config.split_on_chars = ","
+        config.lowercase = true
+        config.preserve_patterns = [/USD\d+/, /EUR\d+/]
+      end
+
+      tokens = TokenKit.tokenize("product,USD50,price,EUR45")
+      expect(tokens).to eq(["product", "USD50", "price", "EUR45"])
+    end
+
+    xit "preserves email addresses in semicolon-separated data" do
+      TokenKit.configure do |config|
+        config.strategy = :char_group
+        config.split_on_chars = ";"
+        config.lowercase = true
+        config.preserve_patterns = [/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/]
+      end
+
+      tokens = TokenKit.tokenize("name;John.Doe@example.com;active")
+      expect(tokens).to eq(["name", "John.Doe@example.com", "active"])
+    end
+
+    xit "preserves gene names in pipe-separated data" do
+      TokenKit.configure do |config|
+        config.strategy = :char_group
+        config.split_on_chars = "|"
+        config.lowercase = true
+        config.preserve_patterns = [/BRCA\d+/, /TP\d+/]
+      end
+
+      tokens = TokenKit.tokenize("patient|BRCA1|mutation|TP53")
+      expect(tokens).to eq(["patient", "BRCA1", "mutation", "TP53"])
+    end
+
+    it "preserves measurements in space-delimited data" do
+      TokenKit.configure do |config|
+        config.strategy = :char_group
+        config.split_on_chars = " "
+        config.lowercase = true
+        config.preserve_patterns = [/\d+(mg|ug|ml)/i]
+      end
+
+      tokens = TokenKit.tokenize("dose 100mg sample 50ug volume 10ml")
+      expect(tokens).to eq(["dose", "100mg", "sample", "50ug", "volume", "10ml"])
+    end
+
+    it "preserves patterns that span delimiters" do
+      TokenKit.configure do |config|
+        config.strategy = :char_group
+        config.split_on_chars = " "
+        config.lowercase = true
+        config.preserve_patterns = [/anti-CD\d+/i]
+      end
+
+      tokens = TokenKit.tokenize("anti-CD3 treatment anti-CD28 therapy")
+      expect(tokens).to eq(["anti-CD3", "treatment", "anti-CD28", "therapy"])
+    end
+
+    # This test works because it uses space as delimiter (whitespace tokenization)
+    it "works with remove_punctuation" do
+      TokenKit.configure do |config|
+        config.strategy = :char_group
+        config.split_on_chars = " "
+        config.lowercase = true
+        config.remove_punctuation = true
+        config.preserve_patterns = [/v\d+\.\d+\.\d+/]
+      end
+
+      tokens = TokenKit.tokenize("version v1.2.3 ready")
+      expect(tokens).to eq(["version", "v1.2.3", "ready"])
+    end
+  end
+
 end

@@ -218,4 +218,69 @@ RSpec.describe "Lowercase Tokenizer" do
     end
   end
 
+  context "with preserve_patterns" do
+    it "preserves gene names while lowercasing others" do
+      TokenKit.configure do |config|
+        config.strategy = :lowercase
+        config.preserve_patterns = [/BRCA\d+/, /TP\d+/]
+      end
+
+      tokens = TokenKit.tokenize("Patient BRCA1 test TP53 done")
+      expect(tokens).to eq(["patient", "BRCA1", "test", "TP53", "done"])
+    end
+
+    it "preserves uppercase acronyms" do
+      TokenKit.configure do |config|
+        config.strategy = :lowercase
+        config.preserve_patterns = [/[A-Z]{2,}/]
+      end
+
+      tokens = TokenKit.tokenize("The FDA and NIH study")
+      expect(tokens).to eq(["the", "FDA", "and", "NIH", "study"])
+    end
+
+    it "preserves patterns spanning non-letters" do
+      TokenKit.configure do |config|
+        config.strategy = :lowercase
+        config.preserve_patterns = [/Anti-CD\d+/]
+      end
+
+      tokens = TokenKit.tokenize("Anti-CD3 treatment Anti-CD28")
+      expect(tokens).to eq(["Anti-CD3", "treatment", "Anti-CD28"])
+    end
+
+    it "preserves measurements" do
+      TokenKit.configure do |config|
+        config.strategy = :lowercase
+        config.preserve_patterns = [/\d+(mg|ug|ml)/i]
+      end
+
+      tokens = TokenKit.tokenize("DOSE 100mg SAMPLE 50ug")
+      expect(tokens).to eq(["dose", "100mg", "sample", "50ug"])
+    end
+
+    it "preserves email addresses" do
+      TokenKit.configure do |config|
+        config.strategy = :lowercase
+        config.preserve_patterns = [/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/]
+      end
+
+      tokens = TokenKit.tokenize("CONTACT John.Doe@example.com NOW")
+      expect(tokens).to eq(["contact", "John.Doe@example.com", "now"])
+    end
+
+    it "preserves mixed patterns" do
+      TokenKit.configure do |config|
+        config.strategy = :lowercase
+        config.preserve_patterns = [
+          /USA/,
+          /v\d+\.\d+\.\d+/
+        ]
+      end
+
+      tokens = TokenKit.tokenize("USA VERSION v2.0.1 READY")
+      expect(tokens).to eq(["USA", "version", "v2.0.1", "ready"])
+    end
+  end
+
 end

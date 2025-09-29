@@ -67,7 +67,7 @@ pub fn from_config(config: TokenizerConfig) -> Result<Box<dyn Tokenizer>, String
     }
 }
 
-fn merge_overlapping_spans(mut spans: Vec<(usize, usize, String)>) -> Vec<(usize, usize, String)> {
+pub(crate) fn merge_overlapping_spans(mut spans: Vec<(usize, usize, String)>) -> Vec<(usize, usize, String)> {
     if spans.is_empty() {
         return spans;
     }

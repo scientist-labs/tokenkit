@@ -1,13 +1,24 @@
-use super::Tokenizer;
+use super::{apply_preserve_patterns, Tokenizer};
 use crate::config::TokenizerConfig;
+use regex::Regex;
 
 pub struct LowercaseTokenizer {
     config: TokenizerConfig,
+    preserve_patterns: Vec<Regex>,
 }
 
 impl LowercaseTokenizer {
     pub fn new(config: TokenizerConfig) -> Self {
-        Self { config }
+        let preserve_patterns = config
+            .preserve_patterns
+            .iter()
+            .filter_map(|p| Regex::new(p).ok())
+            .collect();
+
+        Self {
+            config,
+            preserve_patterns,
+        }
     }
 }
 
@@ -34,7 +45,16 @@ impl Tokenizer for LowercaseTokenizer {
         // Lowercase tokenizer always lowercases, ignore config.lowercase
         // Note: remove_punctuation has no effect since we already split on non-alphabetic
         // characters, but we keep it for consistency with the Tokenizer interface
-        tokens
+
+        if !self.preserve_patterns.is_empty() {
+            // For preserve_patterns, we need to pass a modified config that doesn't lowercase
+            // because apply_preserve_patterns handles lowercasing for non-preserved tokens
+            let mut modified_config = self.config.clone();
+            modified_config.lowercase = true; // Force lowercase for non-preserved tokens
+            apply_preserve_patterns(tokens, &self.preserve_patterns, text, &modified_config)
+        } else {
+            tokens
+        }
     }
 
     fn config(&self) -> &TokenizerConfig {

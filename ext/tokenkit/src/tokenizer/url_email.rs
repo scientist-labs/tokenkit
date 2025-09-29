@@ -1,15 +1,26 @@
-use super::{post_process, Tokenizer};
+use super::{merge_overlapping_spans, post_process, Tokenizer};
 use crate::config::TokenizerConfig;
 use linkify::{LinkFinder, LinkKind};
+use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
 pub struct UrlEmailTokenizer {
     config: TokenizerConfig,
+    preserve_patterns: Vec<Regex>,
 }
 
 impl UrlEmailTokenizer {
     pub fn new(config: TokenizerConfig) -> Self {
-        Self { config }
+        let preserve_patterns = config
+            .preserve_patterns
+            .iter()
+            .filter_map(|p| Regex::new(p).ok())
+            .collect();
+
+        Self {
+            config,
+            preserve_patterns,
+        }
     }
 
     fn extract_url_email_spans(&self, text: &str) -> Vec<(usize, usize, String)> {
@@ -32,7 +43,21 @@ impl UrlEmailTokenizer {
 
 impl Tokenizer for UrlEmailTokenizer {
     fn tokenize(&self, text: &str) -> Vec<String> {
-        let spans = self.extract_url_email_spans(text);
+        let mut spans = self.extract_url_email_spans(text);
+
+        // Add preserve_pattern matches to spans
+        for pattern in &self.preserve_patterns {
+            for mat in pattern.find_iter(text) {
+                spans.push((mat.start(), mat.end(), mat.as_str().to_string()));
+            }
+        }
+
+        // Merge overlapping spans to handle conflicts
+        let spans = if !spans.is_empty() {
+            merge_overlapping_spans(spans)
+        } else {
+            spans
+        };
 
         if spans.is_empty() {
             let tokens: Vec<String> = text
@@ -56,7 +81,9 @@ impl Tokenizer for UrlEmailTokenizer {
                 result.extend(before_tokens);
             }
 
-            let preserved = if self.config.lowercase {
+            // Don't lowercase preserved patterns, but do lowercase URLs/emails if config says so
+            // unless they are from preserve_patterns
+            let preserved = if self.config.lowercase && !self.preserve_patterns.iter().any(|p| p.is_match(&url_or_email)) {
                 url_or_email.to_lowercase()
             } else {
                 url_or_email
