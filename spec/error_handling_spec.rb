@@ -14,18 +14,13 @@ RSpec.describe "Error Handling" do
       }.to raise_error(StandardError, /Invalid regex pattern/)
     end
 
-    it "handles invalid preserve_patterns gracefully" do
-      # Note: Currently filters out invalid patterns silently
-      # This test documents current behavior - should we change it?
+    it "raises error for invalid preserve_patterns" do
+      # Now we validate preserve patterns and raise errors for invalid ones
       expect {
         TokenKit.configure do |config|
           config.preserve_patterns = [/valid/, "[invalid("]
         end
-      }.not_to raise_error
-
-      # Should still tokenize with valid patterns only
-      tokens = TokenKit.tokenize("test valid text")
-      expect(tokens).to be_a(Array)
+      }.to raise_error(StandardError, /Invalid regex pattern/)
     end
   end
 

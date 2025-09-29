@@ -1,7 +1,9 @@
 mod config;
+mod error;
 mod tokenizer;
 
 use config::{TokenizerConfig, TokenizerStrategy};
+use error::TokenizerError;
 use magnus::{define_module, function, Error, RArray, RHash, TryConvert};
 use std::sync::Mutex;
 
@@ -14,55 +16,54 @@ static DEFAULT_CONFIG: Mutex<TokenizerConfig> = Mutex::new(TokenizerConfig {
 });
 
 // Create a fresh tokenizer for each tokenize call
-fn tokenize(text: String) -> Result<Vec<String>, Error> {
+fn tokenize(text: String) -> std::result::Result<Vec<String>, Error> {
     // Get current default config
     let config = DEFAULT_CONFIG
         .lock()
-        .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))?
+        .map_err(|e| TokenizerError::MutexError(e.to_string()))?
         .clone();
 
     // Create fresh tokenizer from config
-    let tokenizer = tokenizer::from_config(config)
-        .map_err(|e| Error::new(magnus::exception::runtime_error(), e))?;
+    let tokenizer = tokenizer::from_config(config)?;
 
     // Tokenize and return
     Ok(tokenizer.tokenize(&text))
 }
 
 // Configure sets the default configuration
-fn configure(config_hash: RHash) -> Result<(), Error> {
+fn configure(config_hash: RHash) -> std::result::Result<(), Error> {
     let config = parse_config_from_hash(config_hash)?;
 
     // Update default config
     let mut default = DEFAULT_CONFIG
         .lock()
-        .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))?;
+        .map_err(|e| TokenizerError::MutexError(e.to_string()))?;
     *default = config;
 
     Ok(())
 }
 
 // Reset to factory defaults
-fn reset() -> Result<(), Error> {
+fn reset() -> std::result::Result<(), Error> {
     let mut default = DEFAULT_CONFIG
         .lock()
-        .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))?;
+        .map_err(|e| TokenizerError::MutexError(e.to_string()))?;
     *default = TokenizerConfig::default();
     Ok(())
 }
 
 // Get current default configuration
-fn config_hash() -> Result<RHash, Error> {
+fn config_hash() -> std::result::Result<RHash, Error> {
     let config = DEFAULT_CONFIG
         .lock()
-        .map_err(|e| Error::new(magnus::exception::runtime_error(), e.to_string()))?
+        .map_err(|e| TokenizerError::MutexError(e.to_string()))?
         .clone();
 
     config_to_hash(&config)
 }
 
 // Helper function to convert config to RHash
-fn config_to_hash(config: &TokenizerConfig) -> Result<RHash, Error> {
+fn config_to_hash(config: &TokenizerConfig) -> std::result::Result<RHash, Error> {
     let hash = RHash::new();
 
     let strategy_str = match &config.strategy {
@@ -121,7 +122,7 @@ fn config_to_hash(config: &TokenizerConfig) -> Result<RHash, Error> {
 }
 
 // Parse config from Ruby hash
-fn parse_config_from_hash(config_hash: RHash) -> Result<TokenizerConfig, Error> {
+fn parse_config_from_hash(config_hash: RHash) -> std::result::Result<TokenizerConfig, Error> {
     let strategy_val = config_hash.get("strategy");
     let strategy = if let Some(val) = strategy_val {
         let strategy_str: String = TryConvert::try_convert(val)?;
@@ -132,9 +133,8 @@ fn parse_config_from_hash(config_hash: RHash) -> Result<TokenizerConfig, Error> 
                 let regex_val = config_hash
                     .get("regex")
                     .ok_or_else(|| {
-                        Error::new(
-                            magnus::exception::arg_error(),
-                            "pattern strategy requires regex parameter",
+                        TokenizerError::InvalidConfiguration(
+                            "pattern strategy requires regex parameter".to_string()
                         )
                     })?;
                 let regex: String = TryConvert::try_convert(regex_val)?;
@@ -203,10 +203,7 @@ fn parse_config_from_hash(config_hash: RHash) -> Result<TokenizerConfig, Error> 
             "letter" => TokenizerStrategy::Letter,
             "lowercase" => TokenizerStrategy::Lowercase,
             _ => {
-                return Err(Error::new(
-                    magnus::exception::arg_error(),
-                    format!("Unknown tokenizer strategy: {}", strategy_str),
-                ))
+                return Err(TokenizerError::UnknownStrategy(strategy_str).into())
             }
         }
     } else {
@@ -241,33 +238,84 @@ fn parse_config_from_hash(config_hash: RHash) -> Result<TokenizerConfig, Error> 
         Vec::new()
     };
 
-    Ok(TokenizerConfig {
+    let config = TokenizerConfig {
         strategy,
         lowercase,
         remove_punctuation,
         preserve_patterns,
-    })
+    };
+
+    // Validate the configuration
+    validate_config(&config)?;
+
+    Ok(config)
+}
+
+// Validate configuration parameters
+fn validate_config(config: &TokenizerConfig) -> std::result::Result<(), TokenizerError> {
+    use TokenizerStrategy::*;
+
+    match &config.strategy {
+        EdgeNgram { min_gram, max_gram } | Ngram { min_gram, max_gram } => {
+            if *min_gram == 0 {
+                return Err(TokenizerError::InvalidNgramConfig {
+                    min: *min_gram,
+                    max: *max_gram,
+                });
+            }
+            if min_gram > max_gram {
+                return Err(TokenizerError::InvalidNgramConfig {
+                    min: *min_gram,
+                    max: *max_gram,
+                });
+            }
+        }
+        PathHierarchy { delimiter } => {
+            if delimiter.is_empty() {
+                return Err(TokenizerError::EmptyDelimiter {
+                    tokenizer: "PathHierarchy".to_string(),
+                });
+            }
+        }
+        Pattern { regex } => {
+            // Validate regex pattern
+            regex::Regex::new(regex).map_err(|e| TokenizerError::InvalidRegex {
+                pattern: regex.clone(),
+                error: e.to_string(),
+            })?;
+        }
+        _ => {}
+    }
+
+    // Validate preserve patterns
+    for pattern in &config.preserve_patterns {
+        regex::Regex::new(pattern).map_err(|e| TokenizerError::InvalidRegex {
+            pattern: pattern.clone(),
+            error: e.to_string(),
+        })?;
+    }
+
+    Ok(())
 }
 
 // Load config is just an alias for configure (for backward compat)
-fn load_config(config_hash: RHash) -> Result<(), Error> {
+fn load_config(config_hash: RHash) -> std::result::Result<(), Error> {
     configure(config_hash)
 }
 
 // Tokenize with a specific config (creates fresh tokenizer)
-fn tokenize_with_config(text: String, config_hash: RHash) -> Result<Vec<String>, Error> {
+fn tokenize_with_config(text: String, config_hash: RHash) -> std::result::Result<Vec<String>, Error> {
     let config = parse_config_from_hash(config_hash)?;
 
     // Create fresh tokenizer from config
-    let tokenizer = tokenizer::from_config(config)
-        .map_err(|e| Error::new(magnus::exception::runtime_error(), e))?;
+    let tokenizer = tokenizer::from_config(config)?;
 
     // Tokenize and return
     Ok(tokenizer.tokenize(&text))
 }
 
 #[magnus::init]
-fn init(_ruby: &magnus::Ruby) -> Result<(), Error> {
+fn init(_ruby: &magnus::Ruby) -> std::result::Result<(), Error> {
     let module = define_module("TokenKit")?;
 
     // Public API functions

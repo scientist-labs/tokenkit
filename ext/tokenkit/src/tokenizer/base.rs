@@ -2,19 +2,14 @@ use crate::config::TokenizerConfig;
 use regex::Regex;
 
 /// Common functionality for tokenizers that support preserve_patterns
+/// Note: Since we validate patterns in validate_config(), they're guaranteed to be valid here
 pub fn create_preserve_patterns(config: &TokenizerConfig) -> Vec<Regex> {
     config
         .preserve_patterns
         .iter()
-        .filter_map(|p| {
-            match Regex::new(p) {
-                Ok(regex) => Some(regex),
-                Err(e) => {
-                    // TODO: Phase 6 - Add proper error handling/logging here
-                    eprintln!("Warning: Invalid regex pattern '{}': {}", p, e);
-                    None
-                }
-            }
+        .map(|p| {
+            // Safe to unwrap because patterns are validated in validate_config()
+            Regex::new(p).expect("Pattern should have been validated")
         })
         .collect()
 }

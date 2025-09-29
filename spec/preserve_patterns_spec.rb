@@ -61,14 +61,12 @@ RSpec.describe "Pattern Preservation" do
   end
 
   context "error handling" do
-    it "ignores invalid regex patterns" do
-      TokenKit.configure do |config|
-        config.preserve_patterns = ["[invalid(regex"]
-      end
-
+    it "raises error for invalid regex patterns" do
       expect {
-        TokenKit.tokenize("test string")
-      }.not_to raise_error
+        TokenKit.configure do |config|
+          config.preserve_patterns = ["[invalid(regex"]
+        end
+      }.to raise_error(RegexpError, /Invalid regex pattern/)
     end
   end
 end

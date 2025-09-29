@@ -1,5 +1,6 @@
 use super::{apply_preserve_patterns, post_process, BaseTokenizerFields, Tokenizer};
 use crate::config::TokenizerConfig;
+use crate::error::Result;
 use regex::Regex;
 
 pub struct PatternTokenizer {
@@ -8,8 +9,9 @@ pub struct PatternTokenizer {
 }
 
 impl PatternTokenizer {
-    pub fn new(regex: &str, config: TokenizerConfig) -> Result<Self, String> {
-        let pattern = Regex::new(regex).map_err(|e| format!("Invalid regex pattern: {}", e))?;
+    pub fn new(regex: &str, config: TokenizerConfig) -> Result<Self> {
+        // Pattern is already validated in validate_config(), safe to unwrap
+        let pattern = Regex::new(regex).expect("Pattern should have been validated");
 
         Ok(Self {
             base: BaseTokenizerFields::new(config),

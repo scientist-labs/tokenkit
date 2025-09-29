@@ -30,13 +30,14 @@ pub use letter::LetterTokenizer;
 pub use lowercase::LowercaseTokenizer;
 
 use crate::config::{TokenizerConfig, TokenizerStrategy};
+use crate::error::Result;
 use regex::Regex;
 
 pub trait Tokenizer: Send + Sync {
     fn tokenize(&self, text: &str) -> Vec<String>;
 }
 
-pub fn from_config(config: TokenizerConfig) -> Result<Box<dyn Tokenizer>, String> {
+pub fn from_config(config: TokenizerConfig) -> Result<Box<dyn Tokenizer>> {
     match config.strategy.clone() {
         TokenizerStrategy::Whitespace => Ok(Box::new(WhitespaceTokenizer::new(config))),
         TokenizerStrategy::Unicode => Ok(Box::new(UnicodeTokenizer::new(config))),
