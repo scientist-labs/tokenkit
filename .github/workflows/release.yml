@@ -28,7 +28,7 @@ jobs:
     # tags + manual dispatch always run; PRs run only when explicitly labelled
     # (the matrix is expensive — opt in per PR rather than on every push).
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'dry-run-release') }}
-    uses: scientist-labs/rust-gem-release/.github/workflows/release.yml@v0
+    uses: scientist-labs/rust-gem-release/.github/workflows/release.yml@0.10.0
     with:
       gem-name: tokenkit
       version-command: ruby -r./lib/tokenkit/version -e 'print TokenKit::VERSION'
