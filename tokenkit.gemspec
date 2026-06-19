@@ -33,7 +33,22 @@ Gem::Specification.new do |spec|
   spec.bindir = "exe"
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
-  spec.extensions = ["ext/tokenkit/extconf.rb"]
+
+  # Precompiled platform gems (e.g. arm64-darwin, built natively on a macOS runner)
+  # carry one compiled extension per Ruby ABI under lib/tokenkit/<major.minor>/ and must
+  # NOT declare extensions, or RubyGems would try to recompile from Rust source on
+  # install — defeating the precompiled gem. The linux platform gems are assembled by
+  # rake-compiler/rb_sys (which clears extensions itself); this env gate covers the
+  # manually-assembled darwin fat gem. The freshly-compiled bundles are untracked, so the
+  # `spec.files +=` append is required (spec.files above comes from `git ls-files`).
+  # Unset => normal source gem.
+  if (platform_gem = ENV["RUST_GEM_PLATFORM"])
+    spec.platform = platform_gem
+    spec.extensions = []
+    spec.files += Dir["lib/tokenkit/*/tokenkit.bundle"] + Dir["lib/tokenkit/*/tokenkit.so"]
+  else
+    spec.extensions = ["ext/tokenkit/extconf.rb"]
+  end
 
   spec.add_dependency "rb_sys", "~> 0.9"
 

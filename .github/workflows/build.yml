@@ -1,0 +1,7 @@
+name: build
+
+on: pull_request
+
+jobs:
+  build:
+    uses: scientist-labs/rust-gem-release/.github/workflows/build.yml@0.10.0
